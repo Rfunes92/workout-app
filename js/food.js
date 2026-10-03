@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const WO = window.WO;
-  const KEY = 'ronnieFood.v1';
+  const KEY = WO.ns('ronnieFood.v1');
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -212,7 +212,7 @@
   }
 
   function renderGoals() {
-    ui().setTop('Food goals', 'Saved on this device');
+    ui().setTop('Food goals', '');
     const g = st.goals, T = targets(), s = st.settings;
     const f = (id, label, val, extra) => `<div class="grow"><label class="f" for="${id}">${label}</label><input type="number" inputmode="decimal" id="${id}" data-fg="${id}" value="${esc(val)}" ${extra || ''}></div>`;
     let h = `<a href="#food" class="small">‹ Back to Food</a><h1 style="margin:6px 2px">Nutrition goals</h1>`;
@@ -755,6 +755,8 @@
     exportData: () => st,
     importData: d => { if (d && d.v === 1) { localStorage.setItem(KEY, JSON.stringify(d)); st = load(); } },
     reset: () => { localStorage.removeItem(KEY); st = defaults(); },
+    reload: () => { st = load(); },
+    toast: m => toast(m),
     targets, _normOFF: normOFF, _normUSDA: normUSDA, _lookupBarcode: lookupBarcode
   };
 })();

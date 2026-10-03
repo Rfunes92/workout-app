@@ -52,3 +52,22 @@ Setup → Appearance. Dark is the default. System follows the phone's light/dark
 - **Storage:** the choice lives in `localStorage` key `ronnieWorkout.theme` and is included in the backup export/import.
 - **Early load:** `js/theme.js` runs in `<head>` before the stylesheet, so there's no flash of the wrong theme. It also updates `<meta name="theme-color">` (dark `#0d0f12`, light `#f8f9fb`), which sets Android Chrome's status/address bar color.
 - **CSS:** all colors are CSS variables in `css/style.css`. The light palette is a single `html[data-theme="light"]` block that only overrides variables, plus a few small tweaks.
+
+## Accounts & cloud sync (Firebase)
+Optional accounts let each person (e.g. Ronnie and Bri) have their own data that follows them across devices. Firebase project: `torque-fit-e1bae`, free Spark plan.
+- **SDK:** Firebase JS SDK v12.19.0 (modular), vendored in `js/vendor/firebase/` as ES modules, so there's no build step and no CDN. Apache-2.0 license (see `LICENSE.txt` there). Firestore is lazy-loaded only once someone is signed in.
+- **Sign-in:** email/password (sign up, sign in, reset email) and Continue with Google. Google uses a popup and falls back to `signInWithRedirect` (`getRedirectResult` runs after the redirect). It falls back when the popup is blocked or unsupported, and you can also tap "Use full-page Google sign-in". "Use without account" keeps the app fully local.
+- **Offline-first:** localStorage stays the working copy. Signed-in data is namespaced per user (`u:<uid>:ronnieFood.v1`, etc.). `js/cloud.js` mirrors it to Firestore with persistent offline cache:
+  - `users/{uid}/data/workout`: settings, equipment, schedule, swaps, lift log
+  - `users/{uid}/data/prefs`: theme, nutrition goals, food settings
+  - `users/{uid}/data/foodlib`: custom foods, recipes, cached foods, recents, favorites
+  - `users/{uid}/data/weights`: weigh-ins
+  - `users/{uid}/foodDays/{YYYY-MM-DD}`: one doc per day, including water
+  
+  Each doc is `{ j: <JSON string>, updatedAt: <client ms>, su: <server time>, dev }`. Conflicts are last-write-wins per doc. Deleted days become tombstones.
+- **First sign-in on a device that already has data:** if the account is empty, the device's data is uploaded. If the account has different data, you choose: merge (recommended), keep the account's data, or keep this device's data.
+- **Sign out:** waits for pending changes to upload (it warns if offline), then clears this user's local data and the Firestore offline cache.
+- **Delete account:** deletes all of the user's Firestore docs (and verifies they're gone), then the Auth user, then the local data. It asks for the password again if the last sign-in wasn't recent.
+- **Status pill in the top bar:** Synced / Syncing / Offline · N / Sync error / Local (signed out).
+
+Firestore rules: each user can read and write only `users/{uid}/**`.

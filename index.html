@@ -20,7 +20,7 @@
 <body>
   <header class="topbar">
     <div class="brand"><img src="icons/icon.svg" alt="" width="26" height="26"><span id="topTitle">Workout</span></div>
-    <div class="topmeta" id="topMeta"></div>
+    <div class="topright"><button type="button" id="syncPill" class="syncpill" data-s="local" aria-live="polite" title="Sync status"><i></i><span>Local</span></button><div class="topmeta" id="topMeta"></div></div>
   </header>
   <main id="view" class="view" tabindex="-1"></main>
 
@@ -37,6 +37,42 @@
     <div class="sheet-panel"><div class="sheet-grab"></div><div id="sheetBody"></div></div>
   </div>
 
+  <section id="authScreen" class="auth" aria-labelledby="authTitle">
+    <div class="auth-inner">
+      <button type="button" class="close-x auth-x" data-auth-close aria-label="Close">✕</button>
+      <div id="authMain">
+        <div class="auth-logo"><img src="icons/icon.svg" alt="" width="64" height="64"></div>
+        <h1 id="authTitle">Ronnie's Workout</h1>
+        <p class="auth-sub">Sign in to back up your workouts &amp; food log and keep them in sync across your devices.</p>
+        <div id="authLocalNote" class="note hidden">This device already has workout/food data. It will be <b>kept</b> and added to your account when you sign in.</div>
+        <div class="seg auth-seg" role="tablist"><button type="button" class="on" data-auth-mode="signin" role="tab">Sign in</button><button type="button" data-auth-mode="signup" role="tab">Create account</button></div>
+        <form id="authForm" novalidate>
+          <label class="f" for="authEmail">Email</label>
+          <input type="email" id="authEmail" autocomplete="email" inputmode="email" placeholder="you@example.com" required>
+          <label class="f" for="authPw">Password</label>
+          <div class="pwrow"><input type="password" id="authPw" autocomplete="current-password" placeholder="At least 6 characters" required minlength="6"><button type="button" class="pwtoggle" data-pw-toggle aria-label="Show password">Show</button></div>
+          <button type="submit" class="btn block auth-submit" id="authSubmit">Sign in</button>
+          <button type="button" class="linkbtn" id="authForgot">Forgot password?</button>
+        </form>
+        <div class="auth-or"><span>or</span></div>
+        <button type="button" class="btn block gbtn" id="authGoogle"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg><span>Continue with Google</span></button>
+        <div id="authMsg" class="auth-msg" role="status" aria-live="polite"></div>
+        <button type="button" class="linkbtn auth-guest" id="authGuest">Use without account</button>
+        <p class="auth-fine small muted">Each person gets their own account and data. Without an account, everything stays only on this device.</p>
+      </div>
+      <div id="authChoice" class="hidden">
+        <h1>Your account already has data</h1>
+        <p class="auth-sub">This device also has workouts/food data that's different. What should we keep?</p>
+        <div id="choiceSummary" class="choice-sum"></div>
+        <div class="menu">
+          <button type="button" data-choice="merge"><span>🔀 Merge both <span class="pill rest">Recommended</span></span><small class="muted">Combines food logs, weigh-ins, custom foods, recipes &amp; workout history. Settings come from your account.</small></button>
+          <button type="button" data-choice="cloud"><span>☁️ Keep account data</span><small class="muted">Use what's in your account. This device's data is discarded.</small></button>
+          <button type="button" data-choice="device"><span>📱 Keep this device's data</span><small class="muted">Replace your account's data with what's on this device.</small></button>
+        </div>
+      </div>
+      <div id="authBusy" class="auth-busy hidden"><div class="spin"></div><span id="authBusyText">Working…</span></div>
+    </div>
+  </section>
   <nav class="tabbar">
     <a href="#today" data-tab="today"><svg viewBox="0 0 24 24"><path d="M3 10h2v4H3zM19 10h2v4h-2zM6 7h3v10H6zM15 7h3v10h-3zM9 11h6v2H9z"/></svg><span>Today</span></a>
     <a href="#food" data-tab="food"><svg viewBox="0 0 24 24"><path d="M7 2v8a2 2 0 0 0 2 2v10M5 2v6M9 2v6M17 2c-2 1.5-3 4-3 7v4h3v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Food</span></a>
@@ -52,5 +88,6 @@
   <script src="js/foods-seed.js"></script>
   <script src="js/food.js"></script>
   <script src="js/app.js"></script>
+  <script type="module" src="js/cloud.js"></script>
 </body>
 </html>

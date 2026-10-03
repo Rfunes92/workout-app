@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const WO = window.WO;
-  const KEY = 'ronnieWorkout.v1';
+  const KEY = WO.ns('ronnieWorkout.v1');
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -201,9 +201,9 @@
 
   let setupLoc = 'gym';
   function renderSetup() {
-    setTop('Setup', 'Saved on this device');
+    setTop('Setup', '');
     const st = state;
-    let h = `<h1 style="margin:6px 2px">Setup</h1>`;
+    let h = `<h1 style="margin:6px 2px">Setup</h1><div id="accountCard" class="card acct"><h2>Account</h2><div class="small muted">Loading account…</div></div>`;
     // profile
     h += `<div class="card"><h2>Profile</h2>
       <label class="f">Name</label><input type="text" id="pName" value="${esc(st.profile.name)}">
@@ -256,7 +256,7 @@
     $('#sheetBody').innerHTML = html; $('#sheet').classList.remove('hidden'); document.body.style.overflow = 'hidden';
     $('.sheet-panel').scrollTop = 0; mountDemos($('#sheetBody'));
   }
-  function closeSheet() { (WO.sheetCloseHooks || []).forEach(f => { try { f(); } catch (e) { console.warn(e); } }); $('#sheet').classList.add('hidden'); document.body.style.overflow = ''; $('#sheetBody').innerHTML = ''; sheetCtx = null; }
+  function closeSheet() { (WO.sheetCloseHooks || []).slice().forEach(f => { try { f(); } catch (e) { console.warn(e); } }); $('#sheet').classList.add('hidden'); document.body.style.overflow = ''; $('#sheetBody').innerHTML = ''; sheetCtx = null; }
   function findItem(day, key) {
     const s = getWeek()[day];
     const it = [...s.warmup, ...s.items, ...(s.finisher ? [s.finisher] : []), ...(s.cooldown || [])].find(i => i.key === key);
@@ -389,7 +389,7 @@
     if (t.id === 'schedReset') { state.schedule = defaultSchedule(); save(); rerender(true); return; }
     if (t.id === 'blockReset') { state.startDate = iso(mondayOf(new Date())); save(); rerender(true); return; }
     if (t.id === 'swapReset') { state.swaps = {}; save(); rerender(true); return; }
-    if (t.id === 'wipe') { if (confirm('Reset ALL data (workouts, food log, weights)?')) { localStorage.removeItem(KEY); if (WO.food) WO.food.reset(); if (WO.theme) WO.theme.set('dark'); state = defaults(); week = null; rerender(); } return; }
+    if (t.id === 'wipe') { if (confirm('Reset ALL data (workouts, food log, weights)?' + (WO.authUid ? ' This also clears the synced copy in your account.' : ''))) { localStorage.removeItem(KEY); if (WO.food) WO.food.reset(); if (WO.theme) WO.theme.set('dark'); state = defaults(); week = null; rerender(); } return; }
     if (t.id === 'exportBtn') { const b = new Blob([JSON.stringify(Object.assign({}, state, WO.food ? { food: WO.food.exportData() } : {}, WO.theme ? { theme: WO.theme.get() } : {}), null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'workout-backup.json'; a.click(); return; }
     if (t.id === 'setupDone') { state.setupDone = true; save(); location.hash = '#today'; return; }
   });
@@ -411,7 +411,16 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').classList.contains('hidden')) { if (location.hash.startsWith('#ex/')) history.back(); else closeSheet(); } });
   window.addEventListener('hashchange', () => { route(); window.scrollTo(0, 0); });
 
-  WO.ui = { openSheet, closeSheet, setTop, esc, iso, mondayOf, rerender, route, getProfile: () => state.profile, mountDemos };
+  // "Use without account" works even if the sign-in module can't load (offline first launch).
+  document.addEventListener('click', e => {
+    if (e.target.closest('#authGuest')) {
+      if (WO.cloud && WO.cloud.handleGuest) return WO.cloud.handleGuest();
+      try { localStorage.setItem('ronnieAuth.guest', '1'); } catch (err) { /* ignore */ }
+      document.documentElement.classList.remove('needs-auth', 'auth-open');
+    }
+  });
+  setTimeout(() => { const m = $('#authMsg'); if (!WO.cloud && m && document.documentElement.classList.contains('needs-auth')) { m.className = 'auth-msg err'; m.textContent = "Can't reach the sign-in service right now. You can use the app without an account and sign in later from Setup."; } }, 8000);
+  WO.ui = { openSheet, closeSheet, setTop, esc, iso, mondayOf, rerender, route, getProfile: () => state.profile, mountDemos, reloadState: () => { state = load(); week = null; } };
   route();
 })();
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
