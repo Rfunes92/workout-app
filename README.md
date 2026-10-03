@@ -1,6 +1,14 @@
-# Ronnie's Workout (static web app)
+<p align="center"><img src="brand/mountup-wordmark-light.svg" alt="Mount Up" width="420"></p>
 
-Mobile-first workout planner. Plain HTML/CSS/JS, no build step, no server. Everything is saved in the browser's `localStorage`.
+# Mount Up (static web app)
+
+> *"They shall mount up with wings as eagles; they shall run, and not be weary."* (Isaiah 40:31). Also biker slang for getting ready to ride.
+>
+> **Train. Fuel. Rise.**
+
+Live: https://rfunes92.github.io/workout-app/
+
+Mobile-first workout planner + food tracker. Plain HTML/CSS/JS, no build step, no server. Everything is saved in the browser's `localStorage`.
 
 ## Run locally
 ```bash
@@ -71,3 +79,25 @@ Optional accounts let each person (e.g. Ronnie and Bri) have their own data that
 - **Status pill in the top bar:** Synced / Syncing / Offline · N / Sync error / Local (signed out).
 
 Firestore rules: each user can read and write only `users/{uid}/**`.
+
+## Brand (Mount Up)
+Original vector artwork, generated as clean SVG (no stock/copied logos).
+
+- **Mark:** a geometric eagle with raised wings (3 parallel feather bars per side, angled upward) and a hooked-beak head, giving an upward "rise" motion. Built to stay readable at 48px.
+- **Colors:** Amber `#ffb020` → Ember `#ff5a3c` gradient (on dark); on light backgrounds use `#f29a00` → `#ec4a2a`. Ink `#0d0f12` (near-black, also `theme_color`); light surface `#f8f9fb`. Exposed in CSS as `--brand-a` / `--brand-b` per theme.
+- **Wordmark:** "MOUNT UP" in Inter Tight Black (SIL Open Font License), converted to outlines so no font is needed at runtime.
+- **Tagline:** Train. Fuel. Rise.
+
+| File | Use |
+|---|---|
+| `brand/mountup-mark.svg` | Mark, transparent, for dark backgrounds |
+| `brand/mountup-mark-onlight.svg` | Mark, deeper gradient for light backgrounds |
+| `brand/mountup-wordmark-dark.svg` / `-light.svg` | Horizontal lockup (mark + MOUNT UP) for dark / light backgrounds |
+| `brand/mountup-wordtype.svg` | Wordmark text only (`currentColor`) |
+| `brand/icon-any.svg`, `icon-maskable.svg`, `icon-apple.svg` | Icon sources |
+| `icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`, `favicon-32.png`, `favicon-48.png`, `/favicon.ico`, `icons/icon.svg` | App/PWA icons |
+| `screenshots/mountup-brand.png` | Brand sheet |
+
+The in-app logo is an inline SVG sprite (`#mu-mark`, `#mu-word`) in `index.html`, so it themes automatically.
+
+The rebrand changed **no** storage keys (`ronnieWorkout.v1`, `ronnieFood.v1`, `ronnieWorkout.theme`, `ronnieAuth.*`, `ronnieSync`, `u:<uid>:…`) and **no** Firebase settings, so existing data and sync keep working. The repo/URL stays `rfunes92.github.io/workout-app`.

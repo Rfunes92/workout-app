@@ -390,7 +390,7 @@
     if (t.id === 'blockReset') { state.startDate = iso(mondayOf(new Date())); save(); rerender(true); return; }
     if (t.id === 'swapReset') { state.swaps = {}; save(); rerender(true); return; }
     if (t.id === 'wipe') { if (confirm('Reset ALL data (workouts, food log, weights)?' + (WO.authUid ? ' This also clears the synced copy in your account.' : ''))) { localStorage.removeItem(KEY); if (WO.food) WO.food.reset(); if (WO.theme) WO.theme.set('dark'); state = defaults(); week = null; rerender(); } return; }
-    if (t.id === 'exportBtn') { const b = new Blob([JSON.stringify(Object.assign({}, state, WO.food ? { food: WO.food.exportData() } : {}, WO.theme ? { theme: WO.theme.get() } : {}), null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'workout-backup.json'; a.click(); return; }
+    if (t.id === 'exportBtn') { const b = new Blob([JSON.stringify(Object.assign({}, state, WO.food ? { food: WO.food.exportData() } : {}, WO.theme ? { theme: WO.theme.get() } : {}), null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'mountup-backup-' + iso(new Date()) + '.json'; a.click(); return; }
     if (t.id === 'setupDone') { state.setupDone = true; save(); location.hash = '#today'; return; }
   });
   document.addEventListener('change', e => {

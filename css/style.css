@@ -303,7 +303,6 @@ html.needs-auth .topbar,html.needs-auth #view,html.needs-auth .tabbar,html.needs
 html.auth-open:not(.needs-auth) .auth-x{display:block}
 .auth-inner{position:relative;max-width:440px;margin:0 auto;padding:calc(36px + var(--safe-t)) 20px calc(30px + var(--safe-b))}
 .auth-logo{display:flex;justify-content:center;margin-bottom:10px}
-.auth-logo img{width:64px;height:64px;border-radius:16px}
 .auth h1{text-align:center;font-size:26px}
 .auth-sub{text-align:center;color:var(--muted);margin:8px 0 16px}
 .auth-seg{margin:14px 0 4px}
@@ -334,3 +333,13 @@ html[data-theme=dark] .gbtn{background:#131314;color:#e3e3e3;border-color:#8e918
 .nudge{display:flex;gap:10px;align-items:flex-start;border-color:var(--hero-home-b);background:linear-gradient(135deg,var(--hero-home),var(--card) 70%)}
 .nudge .grow b{display:block}
 .nudge .x{background:none;border:0;color:var(--muted);font-size:18px;padding:0 4px;cursor:pointer;line-height:1}
+/* ---------- Mount Up brand ---------- */
+:root{--brand-a:#ffb020;--brand-b:#ff5a3c}
+html[data-theme="light"]{--brand-a:#f29a00;--brand-b:#ec4a2a}
+.brand-mark{width:32px;height:27px;flex:0 0 32px;display:block}
+.auth-logo{margin-bottom:6px}
+.auth-mark{width:132px;height:109px;display:block;filter:drop-shadow(0 6px 18px rgba(255,90,60,.25))}
+html[data-theme="light"] .auth-mark{filter:drop-shadow(0 6px 14px rgba(236,74,42,.18))}
+.auth h1.auth-word{display:flex;justify-content:center;margin:4px 0 0;color:var(--text)}
+.auth-word svg{height:34px;width:auto;display:block}
+.auth-tag{text-align:center;font-size:12px;font-weight:800;letter-spacing:.32em;text-transform:uppercase;color:var(--accent2);margin:10px 0 0;padding-left:.32em}
