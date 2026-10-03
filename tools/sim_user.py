@@ -91,7 +91,7 @@ def main():
 
     # profile (createdAt only if missing)
     prof = get(f'users/{uid}', tok); pf = (prof or {}).get('fields', {})
-    fields = {'email': {'stringValue': cred['email']}, 'displayName': {'stringValue': cred.get('displayName', 'Ava Test')}}
+    fields = {'email': {'stringValue': cred['email']}, 'displayName': {'stringValue': cred.get('displayName', 'Tank')}}
     if 'createdAt' not in pf: fields['createdAt'] = {'timestampValue': datetime.datetime.fromtimestamp(cred['createdAtMs'] / 1000, datetime.timezone.utc).isoformat().replace('+00:00', 'Z')}
     writes.append({'update': {'name': f'projects/{PROJECT}/databases/(default)/documents/users/{uid}', 'fields': fields},
                    'updateMask': {'fieldPaths': list(fields)}, 'updateTransforms': [{'fieldPath': 'lastActive', 'setToServerValue': 'REQUEST_TIME'}]})
