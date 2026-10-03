@@ -83,7 +83,7 @@ Firestore rules: each user can read and write only `users/{uid}/**`.
 ## Brand (Mount Up)
 Original vector artwork, generated as clean SVG (no stock/copied logos).
 
-- **Mark:** a geometric eagle with raised wings (3 parallel feather bars per side, angled upward) and a hooked-beak head, giving an upward "rise" motion. Built to stay readable at 48px.
+- **Mark:** a geometric eagle with raised wings (3 parallel feather bars per side, angled upward) and a side-profile eagle head (flat fierce brow, eye notch, deep hooked beak), giving an upward "rise" motion. Built to stay readable at 48px.
 - **Colors:** Amber `#ffb020` → Ember `#ff5a3c` gradient (on dark); on light backgrounds use `#f29a00` → `#ec4a2a`. Ink `#0d0f12` (near-black, also `theme_color`); light surface `#f8f9fb`. Exposed in CSS as `--brand-a` / `--brand-b` per theme.
 - **Wordmark:** "MOUNT UP" in Inter Tight Black (SIL Open Font License), converted to outlines so no font is needed at runtime.
 - **Tagline:** Train. Fuel. Rise.
