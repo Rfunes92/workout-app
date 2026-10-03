@@ -209,6 +209,10 @@
       <label class="f">Name</label><input type="text" id="pName" value="${esc(st.profile.name)}">
       <div class="row"><div class="grow"><label class="f">Session length (gym/home)</label><select id="pLen">${[30, 45, 60, 75, 90].map(m => `<option value="${m}" ${+st.profile.sessionLength === m ? 'selected' : ''}>${m} min</option>`).join('')}</select></div>
       <div style="width:110px"><label class="f">Units</label><select id="pUnits">${['lb', 'kg'].map(u => `<option ${st.profile.units === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div></div>`;
+    // appearance
+    const th = WO.theme ? WO.theme.get() : 'dark';
+    h += `<div class="card"><h2>Appearance</h2><div class="small muted" style="margin:2px 0 8px">System follows your phone's light/dark setting.</div>
+      <div class="seg theme-seg" role="radiogroup" aria-label="Appearance">${[['light', '☀️ Light'], ['dark', '🌙 Dark'], ['system', '📱 System']].map(([k, l]) => `<button type="button" role="radio" aria-checked="${th === k}" class="${th === k ? 'on' : ''}" data-theme-set="${k}">${l}</button>`).join('')}</div></div>`;
     // goals
     h += `<div class="card"><h2>Goals</h2><div class="small muted">Pick as many as you like — they shape reps, rest and finishers.</div>${Object.entries(WO.GOALS).map(([k, g]) =>
       `<div class="goal eq ${st.goals.includes(k) ? 'on' : ''}" data-goal="${k}"><span class="box"></span><div><b>${g.label}</b><div class="small muted">${g.desc}</div></div></div>`).join('')}</div>`;
@@ -234,7 +238,7 @@
         <div class="row" style="margin-top:6px"><select id="custAs" class="grow"><option value="">Works like… (optional)</option>${WO.EQUIPMENT_GROUPS.map(g => `<optgroup label="${g.group}">${g.items.map(([id, l]) => `<option value="${id}">${esc(l)}</option>`).join('')}</optgroup>`).join('')}</select><button class="btn sm" id="custAdd">Add</button></div>
       </div></div>`;
     // data
-    h += `<div class="card"><h2>Training block & data</h2><div class="small muted" style="margin-bottom:6px">Backup export/import includes workouts, food log, foods, recipes, weights and water.</div><div class="small muted">Current block week: ${WO.blockWeek(st, new Date())} of 4 (week 4 = deload). Started ${esc(st.startDate)}.</div>
+    h += `<div class="card"><h2>Training block & data</h2><div class="small muted" style="margin-bottom:6px">Backup export/import includes workouts, food log, foods, recipes, weights, water and appearance.</div><div class="small muted">Current block week: ${WO.blockWeek(st, new Date())} of 4 (week 4 = deload). Started ${esc(st.startDate)}.</div>
       <div class="row wrap" style="margin-top:10px"><button class="btn sm ghost" id="blockReset">Restart block this week</button><button class="btn sm ghost" id="swapReset">Clear all swaps</button><button class="btn sm ghost" id="exportBtn">Export backup</button><label class="btn sm ghost">Import<input type="file" id="importFile" accept="application/json" hidden></label><button class="btn sm danger" id="wipe">Reset everything</button></div></div>`;
     h += `<a class="card row between" href="#food/goals" style="color:inherit"><div><h2>Nutrition goals</h2><div class="small muted">Calories, protein, carbs/fat split, fiber, water, USDA API key</div></div><span class="muted">›</span></a>`;
     h += `<button class="btn block" id="setupDone" style="margin:8px 0 20px">Save & see today's workout</button>`;
@@ -371,6 +375,8 @@
       return;
     }
     // setup interactions
+    const ts = t.closest('[data-theme-set]');
+    if (ts && WO.theme) { WO.theme.set(ts.dataset.themeSet); ts.parentElement.querySelectorAll('button').forEach(b => { const on = b === ts; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); return; }
     const g = t.closest('[data-goal]');
     if (g) { const k = g.dataset.goal; state.goals = state.goals.includes(k) ? state.goals.filter(x => x !== k) : state.goals.concat(k); save(); g.classList.toggle('on'); return; }
     const eq = t.closest('[data-eq]');
@@ -383,8 +389,8 @@
     if (t.id === 'schedReset') { state.schedule = defaultSchedule(); save(); rerender(true); return; }
     if (t.id === 'blockReset') { state.startDate = iso(mondayOf(new Date())); save(); rerender(true); return; }
     if (t.id === 'swapReset') { state.swaps = {}; save(); rerender(true); return; }
-    if (t.id === 'wipe') { if (confirm('Reset ALL data (workouts, food log, weights)?')) { localStorage.removeItem(KEY); if (WO.food) WO.food.reset(); state = defaults(); week = null; rerender(); } return; }
-    if (t.id === 'exportBtn') { const b = new Blob([JSON.stringify(Object.assign({}, state, WO.food ? { food: WO.food.exportData() } : {}), null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'workout-backup.json'; a.click(); return; }
+    if (t.id === 'wipe') { if (confirm('Reset ALL data (workouts, food log, weights)?')) { localStorage.removeItem(KEY); if (WO.food) WO.food.reset(); if (WO.theme) WO.theme.set('dark'); state = defaults(); week = null; rerender(); } return; }
+    if (t.id === 'exportBtn') { const b = new Blob([JSON.stringify(Object.assign({}, state, WO.food ? { food: WO.food.exportData() } : {}, WO.theme ? { theme: WO.theme.get() } : {}), null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'workout-backup.json'; a.click(); return; }
     if (t.id === 'setupDone') { state.setupDone = true; save(); location.hash = '#today'; return; }
   });
   document.addEventListener('change', e => {
@@ -398,7 +404,7 @@
     if (t.id === 'libLoc') { libFilter.loc = t.value; renderLibList(); return; }
     if (t.id === 'libMus') { libFilter.muscle = t.value; renderLibList(); return; }
     if (t.id === 'importFile' && t.files[0]) {
-      t.files[0].text().then(txt => { const d = JSON.parse(txt); if (d && d.v === 1) { if (d.food && WO.food) WO.food.importData(d.food); delete d.food; localStorage.setItem(KEY, JSON.stringify(d)); state = load(); week = null; rerender(); } else alert('Not a valid backup file.'); }).catch(() => alert('Could not read that file.'));
+      t.files[0].text().then(txt => { const d = JSON.parse(txt); if (d && d.v === 1) { if (d.food && WO.food) WO.food.importData(d.food); delete d.food; if (d.theme && WO.theme) WO.theme.set(d.theme); delete d.theme; localStorage.setItem(KEY, JSON.stringify(d)); state = load(); week = null; rerender(); } else alert('Not a valid backup file.'); }).catch(() => alert('Could not read that file.'));
     }
   });
   document.addEventListener('input', e => { if (e.target.id === 'libQ') { libFilter.q = e.target.value; renderLibList(); } });

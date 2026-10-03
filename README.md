@@ -46,3 +46,9 @@ A Lose It!-style tracker that lives in the same app (`#food`, `#food/progress`, 
 
 ### Barcode scanning
 Android Chrome uses the native `BarcodeDetector` with the rear camera. Other browsers lazy-load the vendored ZXing build (`js/vendor/zxing-library-0.21.3.min.js`, MIT, see `js/vendor/ZXING-LICENSE`). You can always type the digits instead. Camera access needs HTTPS, which GitHub Pages provides, or `localhost`.
+
+## Appearance (Light / Dark / System)
+Setup → Appearance. Dark is the default. System follows the phone's light/dark setting live through `prefers-color-scheme`.
+- **Storage:** the choice lives in `localStorage` key `ronnieWorkout.theme` and is included in the backup export/import.
+- **Early load:** `js/theme.js` runs in `<head>` before the stylesheet, so there's no flash of the wrong theme. It also updates `<meta name="theme-color">` (dark `#0d0f12`, light `#f8f9fb`), which sets Android Chrome's status/address bar color.
+- **CSS:** all colors are CSS variables in `css/style.css`. The light palette is a single `html[data-theme="light"]` block that only overrides variables, plus a few small tweaks.
