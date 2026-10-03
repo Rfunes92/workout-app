@@ -224,6 +224,8 @@ WO.onLocalSave = () => { if (!curUid) return; scanQueued = true; clearTimeout(sc
 async function startSync(user) {
   curUid = user.uid; curUser = user; loadMeta(curUid); setStatus(); renderAccount();
   try { await fs(); } catch (e) { lastErr = e; setStatus(); return; }
+  touchProfile(user);
+  if (isAdmin(user) && location.hash.startsWith('#admin')) window.dispatchEvent(new HashChangeEvent('hashchange'));
   // includeMetadataChanges: so we hear when cached data is confirmed by the server (drives the "Synced" status)
   const opt = { includeMetadataChanges: true };
   unsubs.push(FS.onSnapshot(userCol(curUid, 'data'), opt, onRemote, onListenErr));
@@ -445,6 +447,7 @@ async function wipeCloud(uid) {
   }
   const left = (await FS.getDocsFromServer(userCol(uid, 'data'))).size + (await FS.getDocsFromServer(userCol(uid, 'foodDays'))).size;
   if (left) throw new Error(left + ' cloud records could not be deleted');
+  await FS.deleteDoc(FS.doc(db, 'users', uid)).catch(e => console.warn('Profile delete skipped', e && e.code));
   return n;
 }
 async function doDelete() {
@@ -478,7 +481,7 @@ function renderAccount() {
     card.innerHTML = `<div class="row between"><h2>Account</h2><span class="pill rest">Cloud sync on</span></div>
       <div class="who"><div class="avatar">${esc((name[0] || '?').toUpperCase())}</div><div class="grow"><b>${esc(u.email || name)}</b><div class="small muted">${pid === 'google.com' ? 'Google account' : 'Email & password'}</div></div></div>
       <div class="small muted" id="acctStatus"></div>
-      <div class="row wrap" style="margin-top:12px"><button class="btn sm ghost" id="acctSync">Sync now</button><button class="btn sm ghost" id="acctSignOut">Sign out</button><button class="btn sm danger" id="acctDelete">Delete account</button></div>`;
+      <div class="row wrap" style="margin-top:12px"><button class="btn sm ghost" id="acctSync">Sync now</button><button class="btn sm ghost" id="acctSignOut">Sign out</button><button class="btn sm danger" id="acctDelete">Delete account</button></div>${isAdmin(u) ? '<a class="btn sm" href="#admin" style="margin-top:10px;display:inline-flex">🛡️ Admin dashboard</a>' : ''}`;
   } else if (localUid) {
     card.innerHTML = `<h2>Account</h2><div class="small muted" style="margin:4px 0 10px">Reconnecting…</div><button class="btn sm" data-auth-open>Sign in</button>`;
   } else {
@@ -527,6 +530,53 @@ function handleGuest() {
   }
   LS.setItem(K.guest, '1'); hideAuth(); nudge();
 }
+
+// ---------- profile + admin (read-only) ----------
+// Admin is enforced server-side by Firestore rules (see firestore.rules); this check only decides whether to show the UI.
+const ADMIN_EMAIL = 'ronniefunes92@gmail.com';
+function isAdmin(u) { return !!u && !!u.emailVerified && (u.email || '').toLowerCase() === ADMIN_EMAIL; }
+async function touchProfile(user) {
+  try {
+    const created = user.metadata && user.metadata.creationTime ? FS.Timestamp.fromDate(new Date(user.metadata.creationTime)) : FS.serverTimestamp();
+    await FS.setDoc(FS.doc(db, 'users', user.uid), { email: user.email || '', displayName: user.displayName || '', createdAt: created, lastActive: FS.serverTimestamp() }, { merge: true });
+  } catch (e) { console.warn('Profile update skipped', e && e.code); }
+}
+const fmtTs = t => (t && t.toDate ? t.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
+const parseJ = d => { try { return JSON.parse(d.get('j')); } catch (e) { return null; } };
+WO.routes = WO.routes || {}; WO.afterRoute = WO.afterRoute || {};
+WO.routes.admin = () => `<div class="card"><div class="row between"><h2>🛡️ Admin</h2><a class="btn sm ghost" href="#admin">All users</a></div><div id="adminBox" class="small muted" style="margin-top:8px">${curUser ? 'Loading…' : 'Connecting…'}</div></div>`;
+WO.afterRoute.admin = async uid => {
+  const box = $('#adminBox'); if (!box || !curUser) return;
+  if (!isAdmin(curUser)) { box.textContent = 'Not available.'; return; }
+  try {
+    await fs();
+    if (!uid) {
+      const s = await FS.getDocsFromServer(FS.collection(db, 'users'));
+      const rows = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => ((b.lastActive && b.lastActive.toMillis()) || 0) - ((a.lastActive && a.lastActive.toMillis()) || 0));
+      box.innerHTML = `<div class="small muted">${rows.length} user${rows.length === 1 ? '' : 's'}</div>` + rows.map(r => `<a href="#admin/${esc(r.id)}" class="entry" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none"><div class="grow"><b>${esc(r.email || r.id)}</b><div class="small muted">${esc(r.displayName || '')}${r.displayName ? ' · ' : ''}Joined ${fmtTs(r.createdAt)}</div></div><div class="small muted" style="text-align:right">Active<br>${fmtTs(r.lastActive)}</div></a>`).join('');
+      return;
+    }
+    const [p, data, days] = await Promise.all([FS.getDocFromServer(FS.doc(db, 'users', uid)), FS.getDocsFromServer(userCol(uid, 'data')), FS.getDocsFromServer(userCol(uid, 'foodDays'))]);
+    const D = {}; data.docs.forEach(d => { D[d.id] = parseJ(d); });
+    const w = D.workout || {}, done = w.done || {}, log = w.log || {};
+    const woDays = Object.values(done).filter(v => v && Object.keys(v).length).length;
+    const lastLift = Object.values(log).map(x => x && x.d).filter(Boolean).sort().pop();
+    let fDays = 0, entries = 0, lastFood = '';
+    days.docs.forEach(d => { const v = parseJ(d); if (!v) return; const n = ['breakfast', 'lunch', 'dinner', 'snacks'].reduce((a, m) => a + ((v[m] || []).length), 0); if (n) { fDays++; entries += n; if (d.id > lastFood) lastFood = d.id; } });
+    const ws = Object.entries((D.weights && D.weights.weights) || {}).sort((a, b) => (a[0] < b[0] ? -1 : 1)), lw = ws[ws.length - 1];
+    const foods = Object.keys((D.foodlib && D.foodlib.foods) || {}).length;
+    const P = p.exists() ? p.data() : {};
+    const row = (k, v) => `<div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span class="muted">${k}</span><b>${v}</b></div>`;
+    box.innerHTML = `<div style="color:var(--text)"><b style="font-size:16px">${esc(P.email || uid)}</b><div class="small muted">${esc(P.displayName || '')} · Joined ${fmtTs(P.createdAt)} · Active ${fmtTs(P.lastActive)}</div><div style="margin-top:10px">`
+      + row('Workout days completed', woDays) + row('Lifts with a logged weight', Object.keys(log).length) + row('Last lift logged', esc(lastLift || '—'))
+      + row('Food days logged', fDays) + row('Food entries', entries) + row('Last food day', esc(lastFood || '—'))
+      + row('Latest weight', lw ? `${esc(lw[1])} <span class="small muted">(${esc(lw[0])})</span>` : '—') + row('Weigh-ins', ws.length) + row('Saved foods', foods)
+      + `</div><div class="small muted" style="margin-top:8px">Read-only view.</div></div>`;
+  } catch (e) {
+    console.warn('Admin load failed', e);
+    box.textContent = e && e.code === 'permission-denied' ? 'Permission denied: publish the admin Firestore rules (firestore.rules) first.' : 'Could not load: ' + ((e && e.message) || e);
+  }
+};
 
 // ---------- boot ----------
 WO.cloud = { handleGuest, status: () => ({ uid: curUid, email: curUser && curUser.email, pending: pendingKeys().length + (scanQueued ? 1 : 0), inflight, gotServer, lastErr: lastErr && (lastErr.code || lastErr.message) }), flush: ms => flush(ms || 10000), _fs: fs, _db: () => db, _auth: auth };
