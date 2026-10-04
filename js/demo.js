@@ -197,8 +197,10 @@
     container.innerHTML = '<svg viewBox="' + vb + '" class="demo-svg" role="img" aria-label="Animated demo of ' + ex.name + '"><g></g></svg>';
     const g = container.querySelector('g');
     const d = { el: g, pat, prop, t0: performance.now(), period: ex.kind === 'cardio' ? 900 : 2600 };
-    g.innerHTML = render(pat, pat.f[0], prop, 0);
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // Reduce Motion: show the key/end position (frame 1) instead of the start frame
+    const still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    g.innerHTML = render(pat, pat.f[still && pat.f.length > 1 ? 1 : 0], prop, 0);
+    if (still) return;
     active.add(d);
     if (!raf) raf = requestAnimationFrame(loop);
   }
