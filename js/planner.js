@@ -34,6 +34,21 @@
   const LENGTH_MAX = { 30: 4, 45: 6, 60: 9, 75: 10, 90: 11 };
   const ISO_SLOTS = ['side_delt', 'rear_delt', 'biceps', 'triceps', 'calves', 'ham_iso', 'quad_iso', 'glute_acc', 'fly'];
 
+  // Quiz limitations → exercises the plan avoids (swaps can still pick them on purpose).
+  const LIMIT_BLOCK = {
+    flat_back: ['bb_bench', 'db_bench', 'db_fly', 'skull_crusher', 'dead_bug', 'glute_bridge', 'banded_glute_bridge', 'ball_leg_curl'],
+    squat_back: ['bb_back_squat', 'front_squat', 'smith_squat', 'hack_squat', 'deep_squat_hold'],
+    knees: ['jump_rope', 'jumping_jack', 'burpee', 'box_jump'],
+    shoulders: ['bb_ohp', 'arnold_press', 'band_dislocates']
+  };
+  let curBlocked = new Set();
+  function blockedFor(state) {
+    const s = new Set();
+    ((state.profile && state.profile.limitations) || []).forEach(k => (LIMIT_BLOCK[k] || []).forEach(id => s.add(id)));
+    return s;
+  }
+  const limOk = id => !curBlocked.has(id);
+
   function equipSet(state, loc) {
     const l = state.locations[loc] || { equip: [] };
     const s = new Set(l.equip);
@@ -43,7 +58,7 @@
   function canDo(ex, set) { return ex.req.every(r => r.split('|').some(o => set.has(o))); }
   function available(set) { return WO.EXERCISES.filter(e => canDo(e, set)); }
 
-  function candidates(slot, set) { return WO.EXERCISES.filter(e => e.slots.includes(slot) && canDo(e, set)); }
+  function candidates(slot, set) { return WO.EXERCISES.filter(e => e.slots.includes(slot) && canDo(e, set) && limOk(e.id)); }
   function pick(slot, set, weekUsed, sessUsed) {
     const tries = [slot].concat(FALLBACK[slot] || []);
     for (const s of tries) {
@@ -123,7 +138,7 @@
       if (sch.type === 'off') { sess.notes.push('Full rest. Hit your step goal and protein target.'); return sess; }
       sess.items.push(mk(WO.EX_BY_ID.incline_walk, { sets: 1, reps: '30–45 min easy (Zone 2)', rest: 0 }, { key: 'walk' }));
       ['cat_cow', 'worlds_greatest', 'hip_9090', 'open_book', 'couch_stretch', 'foam_roll'].forEach(id => {
-        const ex = WO.EX_BY_ID[id]; if (canDo(ex, set)) sess.items.push(mk(ex, presc(ex, false, goals), { key: id }));
+        const ex = WO.EX_BY_ID[id]; if (ex && canDo(ex, set) && limOk(id)) sess.items.push(mk(ex, presc(ex, false, goals), { key: id }));
       });
       sess.notes.push('Recovery day: easy movement only. Should feel better after than before.');
       sess.minutes = 45;
@@ -134,9 +149,9 @@
       sess.loc = 'muaythai'; sess.locName = state.locations.muaythai.name; sess.title = 'Muay Thai + Mobility';
       sess.notes.push('Class is your main workout today. Do this light complement before/after — no heavy lifting.');
       ['worlds_greatest', 'hip_9090', 'ankle_rocks', 'open_book', 'band_pull_apart'].forEach(id => {
-        const ex = WO.EX_BY_ID[id]; if (canDo(ex, set)) sess.warmup.push(mk(ex, presc(ex, false, goals), { key: 'w-' + id }));
+        const ex = WO.EX_BY_ID[id]; if (ex && canDo(ex, set) && limOk(id)) sess.warmup.push(mk(ex, presc(ex, false, goals), { key: 'w-' + id }));
       });
-      [['dead_bug', { sets: 2, reps: '8/side', rest: 30 }], ['side_plank', { sets: 2, reps: '20–30s/side', rest: 30 }], ['couch_stretch', { sets: 1, reps: '45s/side', rest: 0 }]].forEach(([id, p]) => {
+      [['dead_bug', { sets: 2, reps: '8/side', rest: 30 }], ['side_plank', { sets: 2, reps: '20–30s/side', rest: 30 }], ['couch_stretch', { sets: 1, reps: '45s/side', rest: 0 }]].filter(([id]) => limOk(id)).forEach(([id, p]) => {
         sess.items.push(mk(WO.EX_BY_ID[id], p, { key: id, note: 'Post-class' }));
       });
       sess.minutes = 15;
@@ -188,12 +203,12 @@
     const wu = isLower ? ['worlds_greatest', 'hip_9090', 'deep_squat_hold'] : ['band_dislocates', 'band_pull_apart', 'open_book', 'cat_cow'];
     const cardioWU = loc === 'gym' ? 'bike or treadmill' : 'jumping jacks / jump rope';
     sess.warmupText = `5 min easy ${cardioWU}, then the mobility below, then 1–2 lighter ramp-up sets of your first lift.`;
-    wu.filter(id => canDo(WO.EX_BY_ID[id], set)).slice(0, goals.includes('mobility') ? 3 : 2).forEach(id => {
+    wu.filter(id => canDo(WO.EX_BY_ID[id], set) && limOk(id)).slice(0, goals.includes('mobility') ? 3 : 2).forEach(id => {
       const ex = WO.EX_BY_ID[id]; sess.warmup.push(mk(ex, presc(ex, false, goals), { key: 'w-' + id }));
     });
 
     // finisher
-    const fins = FINISHERS[loc].filter(id => canDo(WO.EX_BY_ID[id], set) && !sessUsed.has(id));
+    const fins = FINISHERS[loc].filter(id => WO.EX_BY_ID[id] && canDo(WO.EX_BY_ID[id], set) && !sessUsed.has(id) && limOk(id));
     if (fins.length) {
       const fid = state.swaps[`${day}:fin`] && canDo(WO.EX_BY_ID[state.swaps[`${day}:fin`]], set) ? state.swaps[`${day}:fin`] : fins[finIdx % fins.length];
       sess.finisher = { exId: fid, key: 'fin', sets: 1, reps: finisherText(fid, fat), rest: 0, slot: 'cardio' };
@@ -205,6 +220,7 @@
     sess.items.forEach(it => { sec += it.sets * (35 + it.rest); });
     if (sess.finisher) sec += (fat ? 12 : 8) * 60;
     sess.minutes = Math.round(sec / 300) * 5;
+    if (curBlocked.size) sess.notes.push('Built around your limits from the quiz — skipped moves you flagged. Swap is still there if you feel good.');
     if (deload) sess.notes.push('Deload week: drop 1 set and use ~10% lighter weights. Leave 3–4 reps in the tank.');
     else sess.notes.push('Work sets: stop 1–2 reps short of failure (RIR 1–2). Last set of isolation moves can go to failure.');
     return sess;
@@ -219,6 +235,7 @@
     const ah = gymDays.length >= 2 ? ['fullA', 'fullB', 'fullA', 'fullB', 'fullA', 'fullB', 'fullA'] : (AUTO_GYM[Math.min(7, homeDays.length)] || []);
     homeDays.forEach((d, i) => { focus[d] = ah[i]; });
     DAYS.forEach(d => { const f = state.schedule[d].focus; if (f && f !== 'auto') focus[d] = f; });
+    curBlocked = blockedFor(state);
     const weekUsed = new Set(); const week = {};
     let gi = 0, hi = 0;
     DAYS.forEach(d => {
@@ -252,5 +269,5 @@
     'Sleep 7+ hours; 5 am sessions mean an early night the evening before.'
   ];
 
-  Object.assign(WO, { DAYS, DAY_NAMES, GOALS, TEMPLATES, FOCUS_OPTIONS, equipSet, canDo, available, buildWeek, swapOptions, blockWeek, OVERLOAD, FAT_LOSS_TIPS, candidates });
+  Object.assign(WO, { LIMIT_BLOCK, DAYS, DAY_NAMES, GOALS, TEMPLATES, FOCUS_OPTIONS, equipSet, canDo, available, buildWeek, swapOptions, blockWeek, OVERLOAD, FAT_LOSS_TIPS, candidates });
 })();

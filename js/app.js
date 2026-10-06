@@ -17,7 +17,11 @@
     return {
       v: 1,
       setupDone: false,
-      profile: { name: 'Ronnie', units: 'lb', sessionLength: 60 },
+      profile: {
+        name: 'Ronnie', units: 'lb', sessionLength: 60,
+        experience: 'some', limitations: [], train: ['mix'],
+        goalWeight: null, betaFeatures: false, tutorialDone: false
+      },
       goals: ['fat_loss', 'sculpt'],
       locations: {
         gym: { name: 'LA Fitness', equip: WO.PRESETS.gym.items.slice() },
@@ -47,6 +51,11 @@
     out.profile = Object.assign(defaults().profile, s.profile);
     ['gym', 'home', 'muaythai'].forEach(k => { out.locations[k] = Object.assign(defaults().locations[k], (s.locations || {})[k]); out.custom[k] = (s.custom || {})[k] || []; });
     WO.DAYS.forEach(k => { out.schedule[k] = Object.assign({ type: 'rest', time: '', focus: 'auto' }, (s.schedule || {})[k]); });
+    if (WO.flags) {
+      // Prefer explicit profile flag; else hydrate from flags module storage
+      if (typeof out.profile.betaFeatures !== 'boolean') out.profile.betaFeatures = WO.flags.getBeta();
+      else if (out.profile.betaFeatures !== WO.flags.getBeta()) WO.flags.setBeta(!!out.profile.betaFeatures);
+    }
     return out;
   }
   let state = load();
@@ -133,7 +142,7 @@
     const t = s.type === 'off' ? 'rest' : s.type;
     const hello = isToday ? `${new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}, ${esc(state.profile.name || 'there')}` : WO.DAY_NAMES[day];
     let h = '';
-    if (!state.setupDone) h += `<div class="banner"><div class="grow"><b>Set up your equipment & goals</b><div class="small muted">Using defaults: LA Fitness preset + basic home gym.</div></div><a class="btn sm" href="#setup">Setup</a></div>`;
+    if (!state.setupDone) h += `<div class="banner"><div class="grow"><b>Finish coach setup</b><div class="small muted">Welcome → quiz → tutorial builds your plan. Takes a few minutes.</div></div><button type="button" class="btn sm" data-ob-open>Mount Up</button></div>`;
     h += dayStrip(day);
     h += `<div class="hero ${t}"><div class="row between"><span class="tag">${esc(hello)}</span><span class="pill ${t}">${esc(locLabel(s.type))}${s.time ? ' · ' + fmtTime(s.time) : ''}</span></div>
       <h1 style="margin-top:6px">${esc(s.title)}</h1>
@@ -156,6 +165,8 @@
     if (s.cooldown && s.cooldown.length) {
       h += `<div class="section-h"><h2>Cool-down</h2><span class="small muted">~3 min</span></div><div class="card" style="padding:4px 12px">${s.cooldown.map(it => compactRow(day, it)).join('')}</div>`;
     }
+    if (isToday && WO.flags && WO.flags.isOn('weekly_checkin')) h += `<div class="card flat small beta-card"><span class="pill">Beta</span> <b>Weekly coach check-in</b><div class="muted" style="margin-top:4px">Sunday: how'd the week ride? Energy, sleep, weight. Coming together. Thanks for testing.</div></div>`;
+    if (isToday && WO.flags && WO.flags.isOn('latino_food')) h += `<div class="card flat small beta-card"><span class="pill">Beta</span> <b>Sazón mode</b><div class="muted" style="margin-top:4px">Macros that respect the plate: pupusas, carne asada, arroz y frijoles. Food previews land here first.</div></div>`;
     if (s.type === 'gym' || s.type === 'home') h += `<div class="card flat small"><b>Progressive overload</b><div class="muted" style="margin-top:4px">${esc(WO.OVERLOAD[1])}</div></div>`;
     if (!s.items.length && !s.warmup.length) h += `<div class="empty">Nothing scheduled. Enjoy the day off.</div>`;
     return h;
@@ -205,14 +216,25 @@
     const st = state;
     let h = `<h1 style="margin:6px 2px">Setup</h1><div id="accountCard" class="card acct"><h2>Account</h2><div class="small muted">Loading account…</div></div>`;
     // profile
+    const limLabels = { flat_back: 'No flat-back pressing', squat_back: 'Squat-sensitive', knees: 'Knees', shoulders: 'Shoulders' };
+    const limTxt = (st.profile.limitations || []).map(k => limLabels[k] || k).join(' · ') || 'None';
     h += `<div class="card"><h2>Profile</h2>
       <label class="f">Name</label><input type="text" id="pName" value="${esc(st.profile.name)}">
       <div class="row"><div class="grow"><label class="f">Session length (gym/home)</label><select id="pLen">${[30, 45, 60, 75, 90].map(m => `<option value="${m}" ${+st.profile.sessionLength === m ? 'selected' : ''}>${m} min</option>`).join('')}</select></div>
-      <div style="width:110px"><label class="f">Units</label><select id="pUnits">${['lb', 'kg'].map(u => `<option ${st.profile.units === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div></div>`;
+      <div style="width:110px"><label class="f">Units</label><select id="pUnits">${['lb', 'kg'].map(u => `<option ${st.profile.units === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div>
+      <div class="small muted" style="margin-top:8px">Experience: <b style="color:var(--text)">${esc(st.profile.experience || '—')}</b> · Limits: <b style="color:var(--text)">${esc(limTxt)}</b>${st.profile.goalWeight ? ` · Goal wt: <b style="color:var(--text)">${esc(st.profile.goalWeight)} ${esc(st.profile.units)}</b>` : ''}</div></div>`;
     // appearance
     const th = WO.theme ? WO.theme.get() : 'dark';
     h += `<div class="card"><h2>Appearance</h2><div class="small muted" style="margin:2px 0 8px">System follows your phone's light/dark setting.</div>
       <div class="seg theme-seg" role="radiogroup" aria-label="Appearance">${[['light', '☀️ Light'], ['dark', '🌙 Dark'], ['system', '📱 System']].map(([k, l]) => `<button type="button" role="radio" aria-checked="${th === k}" class="${th === k ? 'on' : ''}" data-theme-set="${k}">${l}</button>`).join('')}</div></div>`;
+    const betaOn = !!(st.profile.betaFeatures);
+    h += `<div class="card"><h2>Coach setup</h2>
+      <div class="small muted" style="margin-bottom:8px">Redo the welcome, quiz, and tutorial anytime. Your lift log and food stay put — only the plan preferences get rebuilt.</div>
+      <button type="button" class="btn block" id="redoOnboard">Redo onboarding</button></div>`;
+    h += `<div class="card"><div class="row between"><h2>Beta features</h2><span class="pill ${betaOn ? 'rest' : ''}">${betaOn ? 'On' : 'Off'}</span></div>
+      <div class="small muted" style="margin:2px 0 10px">Off by default. Turns on unfinished experiments on <b>this device</b> (ones Admin marked as Beta). Live features stay on for everyone.</div>
+      <label class="eq ${betaOn ? 'on' : ''}" id="betaToggle" style="cursor:pointer"><span class="box"></span><div><b>Enable beta features</b><div class="small muted">Latino food previews, desktop shell experiments, and other gated work.</div></div></label>
+      ${WO.flags ? `<div class="small muted" style="margin-top:10px">Flag status: ${Object.keys(WO.flags.CATALOG).map(k => `${WO.flags.CATALOG[k].label.split('(')[0].trim()} <b style="color:var(--text)">${WO.flags.modeOf(k)}</b>${WO.flags.isOn(k) ? ' ✓' : ''}`).join(' · ')}</div>` : ''}</div>`;
     h += `<div class="card"><h2>App looks tiny / zoomed out?</h2><div class="small muted" style="margin-bottom:8px">On Android Chrome, clear the offline cache so the latest layout fix loads. Your workouts and food log stay on this device.</div>
       <button class="btn block" id="resetLayout">Reset layout / clear offline cache</button></div>`;
     // goals
@@ -330,6 +352,7 @@
   function route() {
     const hash = location.hash.replace(/^#/, '') || 'today';
     const [r, arg] = hash.split('/');
+    document.documentElement.classList.toggle('route-admin', r === 'admin');
     const view = $('#view');
     let tab = r;
     if (r === 'ex') {
@@ -412,6 +435,22 @@
     }
     if (t.id === 'exportBtn') { const b = new Blob([JSON.stringify(Object.assign({}, state, WO.food ? { food: WO.food.exportData() } : {}, WO.theme ? { theme: WO.theme.get() } : {}), null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'mountup-backup-' + iso(new Date()) + '.json'; a.click(); return; }
     if (t.id === 'setupDone') { state.setupDone = true; save(); location.hash = '#today'; return; }
+    if (t.id === 'redoOnboard') {
+      state.setupDone = false;
+      state.profile.tutorialDone = false;
+      save();
+      if (WO.onboard) WO.onboard.start({ step: 'welcome' });
+      return;
+    }
+    if (t.id === 'betaToggle' || t.closest('#betaToggle')) {
+      state.profile.betaFeatures = !state.profile.betaFeatures;
+      if (WO.flags) WO.flags.setBeta(!!state.profile.betaFeatures);
+      save(); rerender(true); return;
+    }
+    if (t.closest('[data-ob-open]')) {
+      if (WO.onboard) WO.onboard.start({ step: 'welcome' });
+      return;
+    }
   });
   document.addEventListener('change', e => {
     const t = e.target;
@@ -440,8 +479,53 @@
     }
   });
   setTimeout(() => { const m = $('#authMsg'); if (!WO.cloud && m && document.documentElement.classList.contains('needs-auth')) { m.className = 'auth-msg err'; m.textContent = "Can't reach the sign-in service right now. You can use the app without an account and sign in later from Setup."; } }, 8000);
-  WO.ui = { openSheet, closeSheet, setTop, esc, iso, mondayOf, rerender, route, getProfile: () => state.profile, mountDemos, reloadState: () => { state = load(); week = null; } };
+  function applyOnboarding(d) {
+    state.profile.name = d.name || state.profile.name;
+    state.profile.sessionLength = d.sessionLength || state.profile.sessionLength;
+    state.profile.units = d.units || state.profile.units;
+    state.profile.experience = d.experience || 'some';
+    state.profile.limitations = Array.isArray(d.limitations) ? d.limitations.slice() : [];
+    state.profile.train = Array.isArray(d.train) ? d.train.slice() : ['mix'];
+    state.profile.goalWeight = d.goalWeight != null && d.goalWeight !== '' ? +d.goalWeight : null;
+    state.profile.tutorialDone = !!d.tutorialDone;
+    state.profile.onboardedAt = new Date().toISOString();
+    state.goals = Array.isArray(d.goals) && d.goals.length ? d.goals.slice() : ['general'];
+    if (d.scheduleDays) {
+      WO.DAYS.forEach(day => {
+        const typ = d.scheduleDays[day] || 'rest';
+        state.schedule[day] = state.schedule[day] || { type: 'rest', time: '', focus: 'auto' };
+        state.schedule[day].type = typ;
+        if (typ === 'gym') state.schedule[day].time = (d.times && d.times.gym) || state.schedule[day].time || '05:00';
+        else if (typ === 'muaythai') state.schedule[day].time = (d.times && d.times.muaythai) || state.schedule[day].time || '18:00';
+        else if (typ === 'home') state.schedule[day].time = (d.times && d.times.home) || '';
+        else state.schedule[day].time = '';
+        if (!['gym', 'home'].includes(typ)) state.schedule[day].focus = 'auto';
+      });
+    }
+    // Ensure equipment presets exist for chosen locations
+    const train = state.profile.train || [];
+    const wants = train.includes('mix') ? ['gym', 'home', 'muaythai'] : train.filter(x => ['gym', 'home', 'muaythai'].includes(x));
+    wants.forEach(loc => {
+      if (!state.locations[loc].equip.length) state.locations[loc].equip = (WO.PRESETS[loc] || WO.PRESETS.home).items.slice();
+    });
+    state.setupDone = true;
+    state.startDate = iso(mondayOf(new Date()));
+    save();
+    week = null;
+  }
+
+  WO.onFlagsChange = () => { if (/^#(setup|today|day)/.test(location.hash || '#today') && $('#sheet').classList.contains('hidden')) rerender(true); };
+  WO.ui = {
+    openSheet, closeSheet, setTop, esc, iso, mondayOf, rerender, route,
+    getProfile: () => state.profile,
+    getState: () => state,
+    mountDemos,
+    reloadState: () => { state = load(); week = null; },
+    applyOnboarding,
+    setBetaFlag: (on) => { state.profile.betaFeatures = !!on; save(); }
+  };
   route();
+  // If auth already cleared before this script finished wiring, onboarding module will pick it up.
 })();
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline support optional */ }); });

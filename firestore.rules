@@ -2,9 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    // Admin (read-only): Ronnie's verified Google email. Optionally pin to his uid: request.auth.uid == '<RONNIE_UID>'
+    // Admin: read-only on user data, write on config/features. Ronnie's verified Google email. Optionally pin to his uid: request.auth.uid == '<RONNIE_UID>'
     function isAdmin() {
       return signedIn() && request.auth.token.email == 'ronniefunes92@gmail.com' && request.auth.token.email_verified == true;
+    }
+    // App-wide feature flags: anyone signed in can read; only the admin can write (Admin → Feature flags).
+    match /config/features {
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
     match /users/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;   // profile doc

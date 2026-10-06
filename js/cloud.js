@@ -225,6 +225,7 @@ async function startSync(user) {
   curUid = user.uid; curUser = user; loadMeta(curUid); setStatus(); renderAccount();
   try { await fs(); } catch (e) { lastErr = e; setStatus(); return; }
   touchProfile(user);
+  watchFlags();
   if (isAdmin(user) && location.hash.startsWith('#admin')) window.dispatchEvent(new HashChangeEvent('hashchange'));
   // includeMetadataChanges: so we hear when cached data is confirmed by the server (drives the "Synced" status)
   const opt = { includeMetadataChanges: true };
@@ -481,7 +482,7 @@ function renderAccount() {
     card.innerHTML = `<div class="row between"><h2>Account</h2><span class="pill rest">Cloud sync on</span></div>
       <div class="who"><div class="avatar">${esc((name[0] || '?').toUpperCase())}</div><div class="grow"><b>${esc(u.email || name)}</b><div class="small muted">${pid === 'google.com' ? 'Google account' : 'Email & password'}</div></div></div>
       <div class="small muted" id="acctStatus"></div>
-      <div class="row wrap" style="margin-top:12px"><button class="btn sm ghost" id="acctSync">Sync now</button><button class="btn sm ghost" id="acctSignOut">Sign out</button><button class="btn sm danger" id="acctDelete">Delete account</button></div>${isAdmin(u) ? '<a class="btn sm" href="#admin" style="margin-top:10px;display:inline-flex">🛡️ Admin dashboard</a>' : ''}`;
+      <div class="row wrap" style="margin-top:12px"><button class="btn sm ghost" id="acctSync">Sync now</button><button class="btn sm ghost" id="acctSignOut">Sign out</button><button class="btn sm danger" id="acctDelete">Delete account</button></div>${isAdmin(u) ? '<a class="btn sm" href="#admin" style="margin-top:10px;display:inline-flex">🛡️ Admin: users &amp; feature flags</a>' : ''}`;
   } else if (localUid) {
     card.innerHTML = `<h2>Account</h2><div class="small muted" style="margin:4px 0 10px">Reconnecting…</div><button class="btn sm" data-auth-open>Sign in</button>`;
   } else {
@@ -535,25 +536,84 @@ function handleGuest() {
 // Admin is enforced server-side by Firestore rules (see firestore.rules); this check only decides whether to show the UI.
 const ADMIN_EMAIL = 'ronniefunes92@gmail.com';
 function isAdmin(u) { return !!u && !!u.emailVerified && (u.email || '').toLowerCase() === ADMIN_EMAIL; }
+function onboardSummary() {
+  const st = WO.ui && WO.ui.getState ? WO.ui.getState() : null;
+  if (!st || !st.setupDone) return { onboarded: false };
+  const p = st.profile || {};
+  return { onboarded: true, coach: { name: p.name || '', goals: st.goals || [], experience: p.experience || '', train: p.train || [], sessionLength: p.sessionLength || 60, limitations: p.limitations || [], goalWeight: p.goalWeight == null ? null : p.goalWeight, units: p.units || 'lb' } };
+}
 async function touchProfile(user) {
   try {
     const created = user.metadata && user.metadata.creationTime ? FS.Timestamp.fromDate(new Date(user.metadata.creationTime)) : FS.serverTimestamp();
-    await FS.setDoc(FS.doc(db, 'users', user.uid), { email: user.email || '', displayName: user.displayName || '', createdAt: created, lastActive: FS.serverTimestamp() }, { merge: true });
+    await FS.setDoc(FS.doc(db, 'users', user.uid), Object.assign({ email: user.email || '', displayName: user.displayName || '', createdAt: created, lastActive: FS.serverTimestamp() }, onboardSummary()), { merge: true });
   } catch (e) { console.warn('Profile update skipped', e && e.code); }
 }
+// Onboarding finished → refresh the profile doc so Admin sees the coach answers.
+WO.onOnboarded = () => { if (curUser && FS) touchProfile(curUser); };
+
+// ---------- app-wide feature flags (config/features, written by admin only) ----------
+let flagsUnsub = null;
+function watchFlags() {
+  if (flagsUnsub || !FS || !WO.flags) return;
+  try {
+    flagsUnsub = FS.onSnapshot(FS.doc(db, 'config', 'features'), s => { const d = s.exists() ? s.data() : null; if (d && d.flags) WO.flags.applyCloud(d.flags); }, e => console.warn('Flags listener', e && e.code));
+    unsubs.push(() => { if (flagsUnsub) flagsUnsub(); flagsUnsub = null; });
+  } catch (e) { console.warn('Flags watch skipped', e); }
+}
+let adminDraft = null;
+function renderFlagsAdmin(box) {
+  const F = WO.flags; if (!F) { box.textContent = 'Flags module missing.'; return; }
+  adminDraft = adminDraft || F.snapshot();
+  const modes = [['off', 'Off'], ['beta', 'Beta'], ['on', 'Live']];
+  box.innerHTML = `<div class="admin-flags-head"><div><h2 style="margin:0">Feature flags</h2><div class="small muted">App-wide. <b>Off</b> = hidden for everyone. <b>Beta</b> = only people who flip Setup → Beta features. <b>Live</b> = everyone.</div></div>
+    <button class="btn" id="flagsPublish">Publish to all users</button></div>
+    <div class="admin-flags">${Object.entries(F.CATALOG).map(([k, c]) => `<div class="card admin-flag"><div class="row between"><b>${esc(c.label)}</b><code class="small muted">${esc(k)}</code></div>
+      <div class="small muted" style="margin:4px 0 10px">${esc(c.desc)}</div>
+      <div class="seg">${modes.map(([m, l]) => `<button type="button" class="${adminDraft[k] === m ? 'on' : ''}" data-flag="${k}" data-mode="${m}">${l}</button>`).join('')}</div></div>`).join('')}</div>
+    <div id="flagsMsg" class="small muted" style="margin-top:10px">${F.loadedCloud() ? 'Showing the published values. Change, then Publish.' : 'No published flags yet: showing defaults.'}</div>`;
+}
+async function publishFlags() {
+  const m = $('#flagsMsg'), b = $('#flagsPublish');
+  if (!curUser || !isAdmin(curUser) || !adminDraft) return;
+  if (b) { b.disabled = true; b.textContent = 'Publishing…'; }
+  try {
+    await fs();
+    await FS.setDoc(FS.doc(db, 'config', 'features'), { flags: adminDraft, updatedAt: FS.serverTimestamp(), by: curUser.email || '' });
+    WO.flags.applyCloud(Object.assign({}, adminDraft));
+    if (m) { m.className = 'small ok'; m.textContent = 'Published. Signed-in users get it live; guests pick it up next time they sign in.'; }
+  } catch (e) {
+    console.warn('Publish flags failed', e);
+    if (m) { m.className = 'small warn'; m.textContent = e && e.code === 'permission-denied' ? 'Permission denied: publish the updated firestore.rules (config/features) in the Firebase console first.' : 'Could not publish: ' + ((e && e.message) || e); }
+  } finally { if (b) { b.disabled = false; b.textContent = 'Publish to all users'; } }
+}
+document.addEventListener('click', e => {
+  const f = e.target.closest('[data-flag]');
+  if (f && adminDraft) { adminDraft[f.dataset.flag] = f.dataset.mode; f.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === f)); const m = $('#flagsMsg'); if (m) { m.className = 'small muted'; m.textContent = 'Unpublished changes.'; } return; }
+  if (e.target.closest('#flagsPublish')) publishFlags();
+});
 const fmtTs = t => (t && t.toDate ? t.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 const parseJ = d => { try { return JSON.parse(d.get('j')); } catch (e) { return null; } };
 WO.routes = WO.routes || {}; WO.afterRoute = WO.afterRoute || {};
-WO.routes.admin = () => `<div class="card"><div class="row between"><h2>🛡️ Admin</h2><a class="btn sm ghost" href="#admin">All users</a></div><div id="adminBox" class="small muted" style="margin-top:8px">${curUser ? 'Loading…' : 'Connecting…'}</div></div>`;
+WO.routes.admin = arg => {
+  if (WO.ui) WO.ui.setTop('Admin', curUser ? esc(curUser.email || '') : '');
+  const sec = arg === 'flags' ? 'flags' : 'users';
+  const nav = [['users', '#admin', '👥', 'Users'], ['flags', '#admin/flags', '🚦', 'Feature flags']];
+  return `<div class="admin-shell"><aside class="admin-side"><div class="admin-brand"><svg viewBox="0 0 484 398" aria-hidden="true"><use href="#mu-mark"/></svg><div><b>Mount Up</b><div class="small muted">Admin</div></div></div>
+    <nav class="admin-nav">${nav.map(([k, h, i, l]) => `<a href="${h}" class="${sec === k ? 'on' : ''}"><span>${i}</span>${l}</a>`).join('')}<a href="#today"><span>↩</span>Back to app</a></nav></aside>
+    <section class="admin-main"><div id="adminBox" class="small muted">${curUser ? 'Loading…' : 'Connecting…'}</div></section></div>`;
+};
 WO.afterRoute.admin = async uid => {
   const box = $('#adminBox'); if (!box || !curUser) return;
   if (!isAdmin(curUser)) { box.textContent = 'Not available.'; return; }
   try {
     await fs();
+    if (uid === 'flags') { renderFlagsAdmin(box); return; }
     if (!uid) {
       const s = await FS.getDocsFromServer(FS.collection(db, 'users'));
       const rows = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => ((b.lastActive && b.lastActive.toMillis()) || 0) - ((a.lastActive && a.lastActive.toMillis()) || 0));
-      box.innerHTML = `<div class="small muted">${rows.length} user${rows.length === 1 ? '' : 's'}</div>` + rows.map(r => `<a href="#admin/${esc(r.id)}" class="entry" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none"><div class="grow"><b>${esc(r.email || r.id)}</b><div class="small muted">${esc(r.displayName || '')}${r.displayName ? ' · ' : ''}Joined ${fmtTs(r.createdAt)}</div></div><div class="small muted" style="text-align:right">Active<br>${fmtTs(r.lastActive)}</div></a>`).join('');
+      const onb = rows.filter(r => r.onboarded).length;
+      box.innerHTML = `<div class="admin-stats"><div class="stat"><b>${rows.length}</b><small>Users</small></div><div class="stat"><b>${onb}</b><small>Finished onboarding</small></div><div class="stat"><b>${rows.filter(r => r.lastActive && Date.now() - r.lastActive.toMillis() < 7 * 864e5).length}</b><small>Active 7 days</small></div></div>
+        <div class="card admin-users">` + rows.map(r => `<a href="#admin/${esc(r.id)}" class="entry admin-urow" style="color:inherit;text-decoration:none"><div class="grow"><b>${esc(r.email || r.id)}</b><div class="small muted">${esc(r.displayName || (r.coach && r.coach.name) || '')}${(r.displayName || (r.coach && r.coach.name)) ? ' · ' : ''}Joined ${fmtTs(r.createdAt)}</div></div><div class="small muted admin-ucoach">${r.onboarded ? esc(((r.coach && r.coach.goals) || []).map(g => (WO.GOALS[g] || {}).label || g).join(', ')) : '<span class="pill">Not onboarded</span>'}</div><div class="small muted" style="text-align:right">Active<br>${fmtTs(r.lastActive)}</div></a>`).join('') + '</div>';
       return;
     }
     const [p, data, days] = await Promise.all([FS.getDocFromServer(FS.doc(db, 'users', uid)), FS.getDocsFromServer(userCol(uid, 'data')), FS.getDocsFromServer(userCol(uid, 'foodDays'))]);
@@ -567,11 +627,13 @@ WO.afterRoute.admin = async uid => {
     const foods = Object.keys((D.foodlib && D.foodlib.foods) || {}).length;
     const P = p.exists() ? p.data() : {};
     const row = (k, v) => `<div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span class="muted">${k}</span><b>${v}</b></div>`;
-    box.innerHTML = `<div style="color:var(--text)"><b style="font-size:16px">${esc(P.email || uid)}</b><div class="small muted">${esc(P.displayName || '')} · Joined ${fmtTs(P.createdAt)} · Active ${fmtTs(P.lastActive)}</div><div style="margin-top:10px">`
+    const C = P.coach || null, LIM = { flat_back: 'Back: lying flat', squat_back: 'Back: squatting', knees: 'Knees', shoulders: 'Shoulders overhead' };
+    const coachHtml = C ? `<div class="card flat"><h3>Coach quiz</h3>` + row('Goals', esc((C.goals || []).map(g => (WO.GOALS[g] || {}).label || g).join(', ') || '—')) + row('Experience', esc(C.experience || '—')) + row('Trains at', esc((C.train || []).join(', ') || '—')) + row('Session length', esc((C.sessionLength || '—') + ' min')) + row('Limitations', esc((C.limitations || []).map(l => LIM[l] || l).join(', ') || 'None')) + row('Goal weight', C.goalWeight ? esc(C.goalWeight + ' ' + (C.units || 'lb')) : '—') + `</div>` : `<div class="card flat small muted">Hasn't finished onboarding yet.</div>`;
+    box.innerHTML = `<div style="color:var(--text)"><a href="#admin" class="small">← All users</a><div style="margin-top:6px"><b style="font-size:16px">${esc(P.email || uid)}</b></div><div class="small muted">${esc(P.displayName || '')} · Joined ${fmtTs(P.createdAt)} · Active ${fmtTs(P.lastActive)}</div><div class="admin-detail"><div class="card flat"><h3>Activity</h3>`
       + row('Workout days completed', woDays) + row('Lifts with a logged weight', Object.keys(log).length) + row('Last lift logged', esc(lastLift || '—'))
       + row('Food days logged', fDays) + row('Food entries', entries) + row('Last food day', esc(lastFood || '—'))
       + row('Latest weight', lw ? `${esc(lw[1])} <span class="small muted">(${esc(lw[0])})</span>` : '—') + row('Weigh-ins', ws.length) + row('Saved foods', foods)
-      + `</div><div class="small muted" style="margin-top:8px">Read-only view.</div></div>`;
+      + `</div>${coachHtml}</div><div class="small muted" style="margin-top:8px">Read-only view.</div></div>`;
   } catch (e) {
     console.warn('Admin load failed', e);
     box.textContent = e && e.code === 'permission-denied' ? 'Permission denied: publish the admin Firestore rules (firestore.rules) first.' : 'Could not load: ' + ((e && e.message) || e);
@@ -579,10 +641,11 @@ WO.afterRoute.admin = async uid => {
 };
 
 // ---------- boot ----------
-WO.cloud = { handleGuest, status: () => ({ uid: curUid, email: curUser && curUser.email, pending: pendingKeys().length + (scanQueued ? 1 : 0), inflight, gotServer, lastErr: lastErr && (lastErr.code || lastErr.message) }), flush: ms => flush(ms || 10000), _fs: fs, _db: () => db, _auth: auth };
+WO.cloud = { handleGuest, _renderFlags: renderFlagsAdmin, status: () => ({ uid: curUid, email: curUser && curUser.email, pending: pendingKeys().length + (scanQueued ? 1 : 0), inflight, gotServer, lastErr: lastErr && (lastErr.code || lastErr.message) }), flush: ms => flush(ms || 10000), _fs: fs, _db: () => db, _auth: auth };
 const flash = sessionStorage.getItem('ronnieAuth.flash');
 if (flash) { sessionStorage.removeItem('ronnieAuth.flash'); setTimeout(() => WO.food && WO.food.toast ? WO.food.toast(flash) : null, 400); }
 setStatus();
+if (location.hash.startsWith('#admin') && WO.ui) WO.ui.route(); // app.js routed before this module registered #admin
 if (html.classList.contains('needs-auth')) $('#authLocalNote').classList.toggle('hidden', !meaningful(snapshotLocal('')));
 if (LS.getItem(K.redirect)) {
   busy(true, 'Finishing Google sign-in…'); html.classList.add('auth-open');

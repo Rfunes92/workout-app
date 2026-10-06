@@ -101,3 +101,21 @@ Original vector artwork, generated as clean SVG (no stock/copied logos).
 The in-app logo is an inline SVG sprite (`#mu-mark`, `#mu-word`) in `index.html`, so it themes automatically.
 
 The rebrand changed **no** storage keys (`ronnieWorkout.v1`, `ronnieFood.v1`, `ronnieWorkout.theme`, `ronnieAuth.*`, `ronnieSync`, `u:<uid>:…`) and **no** Firebase settings, so existing data and sync keep working. The repo/URL stays `rfunes92.github.io/workout-app`.
+
+## Onboarding (Phase 1)
+First launch goes **sign in / create account (or use without account) → Welcome → coach quiz → tutorial → Today**. Code: `js/onboarding.js`, styles under "Onboarding" in `css/style.css`.
+- **Welcome:** explains what Mount Up is (Isaiah 40:31 + biker slang, eagle, posture-first mannequin demos, gym + home + Muay Thai mix).
+- **Quiz (8 steps):** name, goals, experience, where you train (LA Fitness / home / Muay Thai / mix), session length, limitations (back lying flat, back on squats, knees, shoulders), weekly schedule plus gym/Muay Thai times, and an optional goal weight with units.
+- **Saved to** the workout state (`profile.experience/limitations/train/goalWeight/onboardedAt`, `goals`, `schedule`), which syncs through `users/{uid}/data/workout`. A summary also goes on `users/{uid}` (`onboarded`, `coach`) so Admin can see it.
+- **Limitations shape the plan:** `WO.LIMIT_BLOCK` in `planner.js` (for example, flat-back skips flat bench, DB fly, skull crushers, dead bugs and floor bridges; squat-back skips barbell/hack/Smith squats and deep squat holds). Swap can still pick those moves on purpose.
+- **Tutorial:** 5 short tips (Today, logging sets, form demo, rest timer, finishing the day).
+- **Redo:** Setup → Coach setup → Redo onboarding. The lift log and food data are kept.
+
+## Feature flags & beta
+- `js/flags.js` holds the catalog (`latino_food`, `weekly_checkin`, `form_score`, `desktop_shell`, `wearables`). Each flag is **off / beta / live**.
+- **Setup → Beta features** is off by default. It's stored per user in `profile.betaFeatures` and turns on flags set to *beta*.
+- **Admin → Feature flags** (`#admin/flags`, Ronnie only) publishes `config/features` in Firestore. Signed-in clients listen live, and the last values are cached locally. **Deploy the updated `firestore.rules`** (it adds `config/features`: read when signed in, write by admin only).
+- Check a flag in code with `WO.flags.isOn('key')`.
+
+## Desktop Admin
+At ≥900px wide, `#admin` uses a sidebar + wide content layout (user table, 3-column flag grid, 2-column user detail) and hides the tab bar. Phones (the Android viewport fix pins them to 390px) keep the stacked layout.

@@ -121,7 +121,7 @@
         <div class="auth-logo"><svg class="auth-mark" viewBox="0 0 484 398" aria-hidden="true"><use href="#mu-mark"/></svg></div>
         <h1 id="authTitle" class="auth-word"><svg viewBox="0 0 321 50" role="img" aria-label="Mount Up"><use href="#mu-word"/></svg></h1>
         <div class="auth-tag">Train. Fuel. Rise.</div>
-        <p class="auth-sub">Sign in to back up your workouts &amp; food log and keep them in sync across your devices.</p>
+        <p class="auth-sub">Saddle up. Your account keeps your plan, your lifts and your food log riding with you on every device.</p>
         <div id="authLocalNote" class="note hidden">This device already has workout/food data. It will be <b>kept</b> and added to your account when you sign in.</div>
         <div class="seg auth-seg" role="tablist"><button type="button" class="on" data-auth-mode="signin" role="tab">Sign in</button><button type="button" data-auth-mode="signup" role="tab">Create account</button></div>
         <form id="authForm" novalidate>
@@ -151,6 +151,7 @@
       <div id="authBusy" class="auth-busy hidden"><div class="spin"></div><span id="authBusyText">Working…</span></div>
     </div>
   </section>
+  <section id="onboardScreen" class="onboard hidden" aria-label="Mount Up onboarding"><div class="onboard-inner" id="onboardBody"></div></section>
   <nav class="tabbar">
     <a href="#today" data-tab="today"><svg viewBox="0 0 24 24"><path d="M3 10h2v4H3zM19 10h2v4h-2zM6 7h3v10H6zM15 7h3v10h-3zM9 11h6v2H9z"/></svg><span>Today</span></a>
     <a href="#food" data-tab="food"><svg viewBox="0 0 24 24"><path d="M7 2v8a2 2 0 0 0 2 2v10M5 2v6M9 2v6M17 2c-2 1.5-3 4-3 7v4h3v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Food</span></a>
@@ -166,7 +167,9 @@
   <script src="js/planner.js"></script>
   <script src="js/foods-seed.js"></script>
   <script src="js/food.js"></script>
+  <script src="js/flags.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/onboarding.js"></script>
   <script type="module" src="js/cloud.js"></script>
 </body>
 </html>
