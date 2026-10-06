@@ -16,8 +16,9 @@
   --bar:#3a4452;--p-strip:#ff8a73;--wline:#5a6575;--dot:#c9d1dc;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-body{min-height:100vh;padding-bottom:calc(76px + var(--safe-b))}
+html{overflow-x:clip;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{margin:0;width:100%;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{min-height:100vh;min-height:100dvh;padding-bottom:calc(76px + var(--safe-b));overflow-x:clip}
 a{color:var(--accent2);text-decoration:none}
 h1,h2,h3{margin:0;line-height:1.2}
 h1{font-size:26px;font-weight:800;letter-spacing:-.02em}

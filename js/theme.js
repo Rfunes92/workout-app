@@ -1,6 +1,18 @@
 /* Boot helpers, loaded in <head> before the CSS:
    1) per-account localStorage namespace (WO.ns), 2) change hook for cloud sync, 3) sign-in gate class, 4) Light / Dark / System theme. */
 (function () {
+  // Android PWA bug: some phones report devicePixelRatio≈1 so device-width becomes the physical
+  // pixel width (~1080). Layout then looks tiny/letterboxed (max-width:640 centers a narrow column).
+  try {
+    var meta = document.querySelector('meta[name="viewport"]');
+    var sw = Math.min(screen.width || 0, screen.height || 0);
+    var dpr = window.devicePixelRatio || 1;
+    var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (meta && touch && dpr <= 1.15 && sw >= 700) {
+      var target = 390;
+      meta.setAttribute('content', 'width=' + target + ', initial-scale=' + (sw / target).toFixed(4) + ', viewport-fit=cover');
+    }
+  } catch (e) { /* ignore */ }
   window.WO = window.WO || {};
   const WO = window.WO;
   let uid = '', guest = false;
