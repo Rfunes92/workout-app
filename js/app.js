@@ -213,6 +213,8 @@
     const th = WO.theme ? WO.theme.get() : 'dark';
     h += `<div class="card"><h2>Appearance</h2><div class="small muted" style="margin:2px 0 8px">System follows your phone's light/dark setting.</div>
       <div class="seg theme-seg" role="radiogroup" aria-label="Appearance">${[['light', '☀️ Light'], ['dark', '🌙 Dark'], ['system', '📱 System']].map(([k, l]) => `<button type="button" role="radio" aria-checked="${th === k}" class="${th === k ? 'on' : ''}" data-theme-set="${k}">${l}</button>`).join('')}</div></div>`;
+    h += `<div class="card"><h2>App looks tiny / zoomed out?</h2><div class="small muted" style="margin-bottom:8px">On Android Chrome, clear the offline cache so the latest layout fix loads. Your workouts and food log stay on this device.</div>
+      <button class="btn block" id="resetLayout">Reset layout / clear offline cache</button></div>`;
     // goals
     h += `<div class="card"><h2>Goals</h2><div class="small muted">Pick as many as you like — they shape reps, rest and finishers.</div>${Object.entries(WO.GOALS).map(([k, g]) =>
       `<div class="goal eq ${st.goals.includes(k) ? 'on' : ''}" data-goal="${k}"><span class="box"></span><div><b>${g.label}</b><div class="small muted">${g.desc}</div></div></div>`).join('')}</div>`;
@@ -240,8 +242,6 @@
     // data
     h += `<div class="card"><h2>Training block & data</h2><div class="small muted" style="margin-bottom:6px">Backup export/import includes workouts, food log, foods, recipes, weights, water and appearance.</div><div class="small muted">Current block week: ${WO.blockWeek(st, new Date())} of 4 (week 4 = deload). Started ${esc(st.startDate)}.</div>
       <div class="row wrap" style="margin-top:10px"><button class="btn sm ghost" id="blockReset">Restart block this week</button><button class="btn sm ghost" id="swapReset">Clear all swaps</button><button class="btn sm ghost" id="exportBtn">Export backup</button><label class="btn sm ghost">Import<input type="file" id="importFile" accept="application/json" hidden></label><button class="btn sm danger" id="wipe">Reset everything</button></div></div>`;
-    h += `<div class="card"><h2>Display & offline</h2><div class="small muted" style="margin-bottom:8px">If the app looks zoomed out or tiny on Android, clear the offline cache so the latest layout fix loads.</div>
-      <button class="btn sm ghost" id="resetLayout">Reset layout / clear offline cache</button></div>`;
     h += `<a class="card row between" href="#food/goals" style="color:inherit"><div><h2>Nutrition goals</h2><div class="small muted">Calories, protein, carbs/fat split, fiber, water, USDA API key</div></div><span class="muted">›</span></a>`;
     h += `<button class="btn block" id="setupDone" style="margin:8px 0 20px">Save & see today's workout</button>`;
     return h;

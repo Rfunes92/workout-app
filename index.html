@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
   <script>
   /* Android PWA: some devices map device-width to physical px (DPR≈1 or huge innerWidth).
-     Must run inline before CSS so the first paint is not letterboxed; re-applies on pageshow. */
+     Must run inline before CSS so the first paint is not letterboxed; re-applies on pageshow.
+     Android Mobile: always rewrite viewport (do not gate on looksBroken). */
   (function () {
     var TARGET = 390;
     function apply() {
@@ -22,41 +23,50 @@
       var sw = screen.width || 0;
       var sh = screen.height || 0;
       var shortSide = Math.min(sw || iw, sh || ih) || 0;
-      var layoutW = Math.max(iw, (document.documentElement && document.documentElement.clientWidth) || 0);
+      var clientW = (document.documentElement && document.documentElement.clientWidth) || 0;
+      var layoutW = Math.max(iw, clientW);
       var dpr = window.devicePixelRatio || 1;
-      // Physical-px-as-CSS: short side huge with low DPR, or phone layout wider than any real phone CSS width
-      var looksBroken = (shortSide >= 500 && dpr <= 1.5) || (phone && layoutW >= 500) || (androidPhone && layoutW >= 480);
+
+      function rewrite(phys) {
+        if (!phys || phys < 1) phys = TARGET;
+        var scale = phys / TARGET;
+        meta.setAttribute('content',
+          'width=' + TARGET +
+          ', initial-scale=' + scale.toFixed(4) +
+          ', minimum-scale=0.25, maximum-scale=5, viewport-fit=cover');
+        try { document.documentElement.setAttribute('data-mu-vp', 'fixed'); } catch (e) {}
+        // Nuclear Chrome fallback if meta alone does not shrink layout
+        try {
+          var after = Math.max(window.innerWidth || 0, (document.documentElement && document.documentElement.clientWidth) || 0);
+          if (after >= 500 && phone) {
+            document.documentElement.style.zoom = String(TARGET / after);
+            document.documentElement.setAttribute('data-mu-vp', 'zoom');
+          } else if (document.documentElement.getAttribute('data-mu-vp') === 'fixed') {
+            document.documentElement.style.zoom = '';
+          }
+        } catch (e2) {}
+      }
+
+      // Android Mobile: ALWAYS rewrite — phys = max(min(screen.w,screen.h), innerWidth, clientWidth)
+      if (androidPhone) {
+        rewrite(Math.max(shortSide, iw, clientW));
+        return;
+      }
+
+      // iPhone / other touch: gate on looksBroken
+      var looksBroken = (shortSide >= 500 && dpr <= 1.5) || (phone && layoutW >= 500);
       if (!looksBroken) {
-        // Secondary: after first paint, innerWidth still absurdly wide on Android phone
-        if (!(androidPhone && layoutW >= 460)) {
-          // Layout looks healthy — clear any leftover CSS zoom from an earlier pass
-          try {
-            if (layoutW > 0 && layoutW < 500) {
-              document.documentElement.style.zoom = '';
-              if (document.documentElement.getAttribute('data-mu-vp') === 'zoom') document.documentElement.removeAttribute('data-mu-vp');
-            }
-          } catch (e0) {}
-          return;
-        }
+        try {
+          if (layoutW > 0 && layoutW < 500) {
+            document.documentElement.style.zoom = '';
+            if (document.documentElement.getAttribute('data-mu-vp') === 'zoom') document.documentElement.removeAttribute('data-mu-vp');
+          }
+        } catch (e0) {}
+        return;
       }
       var phys = shortSide >= 500 ? shortSide : layoutW;
       if (phys < 460) return;
-      var scale = phys / TARGET;
-      meta.setAttribute('content',
-        'width=' + TARGET +
-        ', initial-scale=' + scale.toFixed(4) +
-        ', minimum-scale=0.25, maximum-scale=5, viewport-fit=cover');
-      try { document.documentElement.setAttribute('data-mu-vp', 'fixed'); } catch (e) {}
-      // Nuclear Chrome fallback if meta alone does not shrink layout
-      try {
-        var after = Math.max(window.innerWidth || 0, (document.documentElement && document.documentElement.clientWidth) || 0);
-        if (after >= 500 && phone) {
-          document.documentElement.style.zoom = String(TARGET / after);
-          document.documentElement.setAttribute('data-mu-vp', 'zoom');
-        } else if (document.documentElement.getAttribute('data-mu-vp') === 'fixed') {
-          document.documentElement.style.zoom = '';
-        }
-      } catch (e2) {}
+      rewrite(phys);
     }
     apply();
     setTimeout(apply, 0);
