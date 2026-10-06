@@ -240,6 +240,8 @@
     // data
     h += `<div class="card"><h2>Training block & data</h2><div class="small muted" style="margin-bottom:6px">Backup export/import includes workouts, food log, foods, recipes, weights, water and appearance.</div><div class="small muted">Current block week: ${WO.blockWeek(st, new Date())} of 4 (week 4 = deload). Started ${esc(st.startDate)}.</div>
       <div class="row wrap" style="margin-top:10px"><button class="btn sm ghost" id="blockReset">Restart block this week</button><button class="btn sm ghost" id="swapReset">Clear all swaps</button><button class="btn sm ghost" id="exportBtn">Export backup</button><label class="btn sm ghost">Import<input type="file" id="importFile" accept="application/json" hidden></label><button class="btn sm danger" id="wipe">Reset everything</button></div></div>`;
+    h += `<div class="card"><h2>Display & offline</h2><div class="small muted" style="margin-bottom:8px">If the app looks zoomed out or tiny on Android, clear the offline cache so the latest layout fix loads.</div>
+      <button class="btn sm ghost" id="resetLayout">Reset layout / clear offline cache</button></div>`;
     h += `<a class="card row between" href="#food/goals" style="color:inherit"><div><h2>Nutrition goals</h2><div class="small muted">Calories, protein, carbs/fat split, fiber, water, USDA API key</div></div><span class="muted">›</span></a>`;
     h += `<button class="btn block" id="setupDone" style="margin:8px 0 20px">Save & see today's workout</button>`;
     return h;
@@ -390,6 +392,24 @@
     if (t.id === 'blockReset') { state.startDate = iso(mondayOf(new Date())); save(); rerender(true); return; }
     if (t.id === 'swapReset') { state.swaps = {}; save(); rerender(true); return; }
     if (t.id === 'wipe') { if (confirm('Reset ALL data (workouts, food log, weights)?' + (WO.authUid ? ' This also clears the synced copy in your account.' : ''))) { localStorage.removeItem(KEY); if (WO.food) WO.food.reset(); if (WO.theme) WO.theme.set('dark'); state = defaults(); week = null; rerender(); } return; }
+    if (t.id === 'resetLayout') {
+      if (!confirm('Clear offline cache and reload? Your workouts and food log stay on this device — only the cached app files are refreshed.')) return;
+      (async () => {
+        try {
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.unregister()));
+          }
+          if (window.caches && caches.keys) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+          }
+        } catch (err) { console.warn('cache reset', err); }
+        try { document.documentElement.style.zoom = ''; document.documentElement.removeAttribute('data-mu-vp'); } catch (e) { /* ignore */ }
+        location.reload(true);
+      })();
+      return;
+    }
     if (t.id === 'exportBtn') { const b = new Blob([JSON.stringify(Object.assign({}, state, WO.food ? { food: WO.food.exportData() } : {}, WO.theme ? { theme: WO.theme.get() } : {}), null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'mountup-backup-' + iso(new Date()) + '.json'; a.click(); return; }
     if (t.id === 'setupDone') { state.setupDone = true; save(); location.hash = '#today'; return; }
   });
