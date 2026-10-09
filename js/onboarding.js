@@ -1,4 +1,4 @@
-/* Phase 1 onboarding: Welcome → Quiz → Tutorial. Distinct Mount Up voice — eagle, Isaiah 40:31 + biker slang, coach energy. */
+/* Phase 1 onboarding: Welcome → Quiz → Tutorial. Mount Up voice — eagle brand, warm coach energy, for anyone in fitness or getting into it. */
 (function () {
   'use strict';
   const WO = window.WO;
@@ -13,11 +13,13 @@
     { id: 'solid', label: 'Solid base', desc: 'You know your lifts; you want sharper programming.' },
     { id: 'veteran', label: 'Veteran', desc: 'Years in. Coach me like I can take it.' }
   ];
-  const LOC_OPTS = [
-    { id: 'gym', label: 'LA Fitness / commercial gym', hint: 'Cables, machines, iron.' },
-    { id: 'home', label: 'Home gym', hint: 'Dumbbells, bands, whatever you’ve got.' },
-    { id: 'muaythai', label: 'Muay Thai', hint: 'Class is the main course; we complement it.' },
-    { id: 'mix', label: 'A mix', hint: 'Gym + home + pads — like Ronnie’s week.' }
+  // Seed list for the gym picker. Typing anything not listed adds it as a custom gym.
+  // TODO(follow-up): pull nearby gyms by location (needs a places API + key).
+  const GYM_LIST = [
+    'LA Fitness', 'Planet Fitness', 'Fusion Gyms', 'Anytime Fitness', 'Equinox', 'Gold’s Gym', '24 Hour Fitness',
+    'Crunch Fitness', 'Life Time', 'YMCA', 'EōS Fitness', 'Chuze Fitness', 'Snap Fitness', 'Blink Fitness',
+    'Workout Anytime', 'Esporta Fitness', 'Retro Fitness', 'UFC Gym', 'CrossFit box', 'Orangetheory',
+    'Apartment / building gym', 'School / campus gym', 'Work gym'
   ];
   const LIMS = [
     { id: 'flat_back', label: 'Back gets angry lying flat', desc: 'We’ll skip or swap flat bench / skull-crushers when we can.' },
@@ -40,11 +42,12 @@
       name: '',
       goals: [],
       experience: 'some',
-      train: ['mix'],
+      gyms: [],
+      homeGym: false,
       sessionLength: 60,
       limitations: [],
-      scheduleDays: { mon: 'gym', tue: 'muaythai', wed: 'rest', thu: 'gym', fri: 'gym', sat: 'home', sun: 'home' },
-      times: { gym: '05:00', muaythai: '18:00', home: '' },
+      scheduleDays: { mon: 'gym', tue: 'rest', wed: 'gym', thu: 'rest', fri: 'gym', sat: 'off', sun: 'off' },
+      dayTimes: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' },
       goalWeight: '',
       units: 'lb'
     };
@@ -54,11 +57,11 @@
     { id: 'name', title: 'What do we call you?', sub: 'First name is enough. This is your coach screen, not a corporate portal.' },
     { id: 'goals', title: 'What’s the mission?', sub: 'Pick what you’re chasing. More than one is fine — we’ll blend the programming.' },
     { id: 'experience', title: 'Where are you on the road?', sub: 'Be honest. The plan gets heavier or simpler from this.' },
-    { id: 'train', title: 'Where do you train?', sub: 'Mount Up mixes commercial gym, home iron, and Muay Thai — not a one-box clone.' },
-    { id: 'length', title: 'How long can a gym/home session run?', sub: 'We’ll trim volume to fit. Class days stay light on purpose.' },
-    { id: 'limits', title: 'Any no-go zones?', sub: 'Especially back stuff. We’ll build around it — no heroics that wreck tomorrow’s ride.' },
-    { id: 'schedule', title: 'Sketch your week', sub: 'Tap each day. You can fine-tune times later in Setup.' },
-    { id: 'weight', title: 'Goal weight? (optional)', sub: 'Helps Food targets later. Skip if you’d rather not.' }
+    { id: 'train', title: 'Where do you train?', sub: 'Pick your gym (or a few), add your home setup, or both. We build around the equipment you actually have.' },
+    { id: 'length', title: 'How long can a session run?', sub: 'We’ll trim volume to fit your window.' },
+    { id: 'limits', title: 'Any no-go zones?', sub: 'Especially back stuff. We’ll build around it — no heroics that wreck tomorrow.' },
+    { id: 'schedule', title: 'Sketch your week', sub: 'Tap each day, then set the time you’ll train. 5am Monday, noon Tuesday — whatever your week looks like.' },
+    { id: 'weight', title: 'Goal weight?', sub: 'This is the target line on your weight chart. You can change it anytime in Setup.' }
   ];
 
   const TIPS = [
@@ -131,9 +134,17 @@
     if (st.profile && st.profile.experience) draft.experience = st.profile.experience;
     if (st.profile && st.profile.limitations) draft.limitations = st.profile.limitations.slice();
     if (st.profile && st.profile.goalWeight) draft.goalWeight = String(st.profile.goalWeight);
-    if (st.profile && st.profile.train) draft.train = st.profile.train.slice();
+    const train = (st.profile && st.profile.train) || [];
+    if (Array.isArray(st.profile.gyms)) draft.gyms = st.profile.gyms.slice();
+    else if ((train.includes('gym') || train.includes('mix')) && st.locations && st.locations.gym) draft.gyms = [st.locations.gym.name];
+    draft.homeGym = typeof st.profile.homeGym === 'boolean' ? st.profile.homeGym : (train.includes('home') || train.includes('mix'));
     if (st.schedule) {
-      DAYS.forEach(d => { if (st.schedule[d]) draft.scheduleDays[d] = st.schedule[d].type; });
+      DAYS.forEach(d => {
+        const s = st.schedule[d]; if (!s) return;
+        // Legacy class days (pre-v16) come back as active recovery; the quiz no longer offers them.
+        draft.scheduleDays[d] = ['gym', 'home', 'rest', 'off'].includes(s.type) ? s.type : 'rest';
+        draft.dayTimes[d] = ['gym', 'home'].includes(draft.scheduleDays[d]) ? (s.time || '') : '';
+      });
     }
   }
 
@@ -160,21 +171,21 @@
   function renderWelcome() {
     return `<div class="ob-wrap ob-welcome">
       <div class="ob-eagle" aria-hidden="true"><svg viewBox="0 0 484 398"><use href="#mu-mark"/></svg></div>
-      <div class="ob-kicker">Isaiah 40:31 · biker slang</div>
+      <div class="ob-kicker">Your coach in your pocket</div>
       <h1 class="ob-word"><svg viewBox="0 0 321 50" role="img" aria-label="Mount Up"><use href="#mu-word"/></svg></h1>
       <p class="ob-tag">Train. Fuel. Rise.</p>
       <div class="ob-card">
         <h2>This isn’t another fitness clone.</h2>
-        <p>Mount Up is a coach in your pocket for people who lift at the gym, hit pads at Muay Thai, and still train when they’re home — without pretending life looks like a sterile app demo.</p>
+        <p>Mount Up is a coach in your pocket for people who lift at the gym, train at home, or are just getting started. Ditch the notebook. Stop googling your next workout between sets. Walk in knowing exactly what to do — and watch yourself get stronger.</p>
         <ul class="ob-bullets">
           <li><b>Eagle brand</b> — rise with strength, not shame.</li>
           <li><b>Posture-first demos</b> — anatomical mannequins that teach how to stand the weight up.</li>
-          <li><b>Real mix</b> — LA Fitness · home iron · Muay Thai, one plan.</li>
-          <li><b>Warm, not cheesy</b> — Christian &amp; biker grit without the caption-energy.</li>
-          <li><b>Food with flavor</b> — macros that respect Latino plates (coming online as we ship it).</li>
+          <li><b>Your gym, your way</b> — any gym, your home setup, or both. One plan built around your equipment and your week.</li>
+          <li><b>Warm, not cheesy</b> — real coach energy for first-timers and veterans alike.</li>
+          <li><b>Track what matters</b> — every set, every weigh-in, and food that fits the way you actually eat.</li>
         </ul>
       </div>
-      <p class="ob-verse small muted">“They shall mount up with wings as eagles; they shall run, and not be weary.” — also what you say when it’s time to ride.</p>
+      <p class="ob-verse small muted">“They shall mount up with wings as eagles; they shall run, and not be weary.”</p>
       <button type="button" class="btn block ob-cta" data-ob="start-quiz">Let’s build your plan</button>
       <button type="button" class="linkbtn ob-skip" data-ob="skip-welcome">I’ve been here — jump to quiz</button>
     </div>`;
@@ -186,7 +197,7 @@
     let body = '';
     if (q.id === 'name') {
       body = `<label class="f" for="obName">Name</label>
-        <input type="text" id="obName" maxlength="32" placeholder="e.g. Ronnie" value="${esc(draft.name)}" autocomplete="given-name">`;
+        <input type="text" id="obName" maxlength="32" placeholder="e.g. Alex" value="${esc(draft.name)}" autocomplete="given-name">`;
     } else if (q.id === 'goals') {
       body = `<div class="ob-options">${Object.entries(WO.GOALS).map(([k, g]) =>
         `<button type="button" class="ob-opt ${draft.goals.includes(k) ? 'on' : ''}" data-ob-goal="${k}"><b>${esc(g.label)}</b><span class="small muted">${esc(g.desc)}</span></button>`
@@ -196,39 +207,40 @@
         `<button type="button" class="ob-opt ${draft.experience === x.id ? 'on' : ''}" data-ob-exp="${x.id}"><b>${esc(x.label)}</b><span class="small muted">${esc(x.desc)}</span></button>`
       ).join('')}</div>`;
     } else if (q.id === 'train') {
-      body = `<div class="ob-options">${LOC_OPTS.map(x =>
-        `<button type="button" class="ob-opt ${draft.train.includes(x.id) ? 'on' : ''}" data-ob-train="${x.id}"><b>${esc(x.label)}</b><span class="small muted">${esc(x.hint)}</span></button>`
-      ).join('')}</div>
-      <p class="small muted" style="margin-top:8px">Pick one primary, or “A mix” for the full week template.</p>`;
+      body = `<button type="button" class="ob-opt ${draft.homeGym ? 'on' : ''}" data-ob="toggle-home"><b>🏠 Home gym</b><span class="small muted">Dumbbells, bands, whatever you’ve got. Fine-tune equipment in Setup.</span></button>
+        <label class="f" for="obGymSearch" style="margin-top:14px">Your gym</label>
+        <input type="search" id="obGymSearch" placeholder="Search gyms — LA Fitness, Planet Fitness…" autocomplete="off" enterkeyhint="done">
+        <div class="ob-gym-picked" id="obGymPicked">${gymPickedHtml()}</div>
+        <div class="ob-gym-results" id="obGymResults">${gymResultsHtml('')}</div>`;
     } else if (q.id === 'length') {
       body = `<div class="seg ob-seg">${[30, 45, 60, 75, 90].map(m =>
         `<button type="button" class="${+draft.sessionLength === m ? 'on' : ''}" data-ob-len="${m}">${m}m</button>`
       ).join('')}</div>
-      <p class="small muted" style="margin-top:10px">Muay Thai class days stay short on purpose — this is for gym/home lifting blocks.</p>`;
+      <p class="small muted" style="margin-top:10px">Short on time? 30 minutes done well still moves the needle.</p>`;
     } else if (q.id === 'limits') {
       body = `<div class="ob-options">${LIMS.map(x =>
         `<button type="button" class="ob-opt ${draft.limitations.includes(x.id) ? 'on' : ''}" data-ob-lim="${x.id}"><b>${esc(x.label)}</b><span class="small muted">${esc(x.desc)}</span></button>`
       ).join('')}</div>`;
     } else if (q.id === 'schedule') {
-      const types = [['gym', 'Gym'], ['home', 'Home'], ['muaythai', 'MT'], ['rest', 'Rest'], ['off', 'Off']];
+      const types = [['gym', 'Gym'], ['home', 'Home'], ['rest', 'Rest'], ['off', 'Off']]
+        .filter(([v]) => (v !== 'gym' || draft.gyms.length || !draft.homeGym) && (v !== 'home' || draft.homeGym || !draft.gyms.length));
       body = `<div class="ob-sched">${DAYS.map(d => {
         const t = draft.scheduleDays[d];
+        const trains = t === 'gym' || t === 'home';
         return `<div class="ob-sched-row"><div class="d">${DAY_SHORT[d]}</div>
           <div class="seg ob-seg-sm">${types.map(([v, l]) =>
             `<button type="button" class="${t === v ? 'on' : ''}" data-ob-day="${d}" data-ob-dtype="${v}">${l}</button>`
-          ).join('')}</div></div>`;
+          ).join('')}</div>
+          ${trains ? `<input type="time" class="ob-day-time" data-ob-time="${d}" value="${esc(draft.dayTimes[d] || '')}" aria-label="${DAY_SHORT[d]} training time">` : ''}</div>`;
       }).join('')}</div>
-      <div class="row" style="margin-top:12px;gap:8px">
-        <div class="grow"><label class="f">Gym time (optional)</label><input type="time" id="obGymTime" value="${esc(draft.times.gym || '')}"></div>
-        <div class="grow"><label class="f">Muay Thai time</label><input type="time" id="obMtTime" value="${esc(draft.times.muaythai || '')}"></div>
-      </div>
+      <p class="small muted" style="margin-top:8px">Times are optional — they show on your Today screen.</p>
       <button type="button" class="btn sm ghost" style="margin-top:10px" data-ob="sched-preset">Use Mount Up default week</button>`;
     } else if (q.id === 'weight') {
       body = `<div class="row">
-        <div class="grow"><label class="f">Goal weight</label><input type="number" id="obGoalWt" inputmode="decimal" step="0.5" placeholder="Optional" value="${esc(draft.goalWeight)}"></div>
+        <div class="grow"><label class="f">Goal weight</label><input type="number" id="obGoalWt" inputmode="decimal" step="0.5" placeholder="Required" required value="${esc(draft.goalWeight)}"></div>
         <div style="width:110px"><label class="f">Units</label><select id="obUnits">${['lb', 'kg'].map(u => `<option ${draft.units === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div>
       </div>
-      <p class="small muted" style="margin-top:8px">You can change this anytime in Food → Goals.</p>`;
+      <p class="small muted" style="margin-top:8px">Log weigh-ins in Food → Weekly &amp; weight to see your trend against this goal.</p>`;
     }
 
     const canNext = quizValid();
@@ -249,9 +261,45 @@
     const q = QUIZ[qi];
     if (q.id === 'name') return !!(draft.name && draft.name.trim());
     if (q.id === 'goals') return draft.goals.length > 0;
-    if (q.id === 'train') return draft.train.length > 0;
+    if (q.id === 'train') return draft.gyms.length > 0 || draft.homeGym;
     if (q.id === 'limits') return draft.limitations.length > 0;
+    if (q.id === 'weight') return goalWeightOk();
     return true;
+  }
+
+  function goalWeightOk() {
+    const v = +draft.goalWeight;
+    const [lo, hi] = draft.units === 'kg' ? [25, 320] : [50, 700];
+    return draft.goalWeight !== '' && isFinite(v) && v >= lo && v <= hi;
+  }
+
+  // Derived for the planner/app: which location types this person trains at.
+  function trainFromDraft() {
+    const t = [];
+    if (draft.gyms.length) t.push('gym');
+    if (draft.homeGym) t.push('home');
+    return t.length ? t : ['gym'];
+  }
+
+  function gymPickedHtml() {
+    if (!draft.gyms.length) return '';
+    return draft.gyms.map(g => `<button type="button" class="ob-chip on" data-ob-gym="${esc(g)}" aria-label="Remove ${esc(g)}">${esc(g)} <span aria-hidden="true">✕</span></button>`).join('');
+  }
+  function gymResultsHtml(q) {
+    q = String(q || '').trim();
+    const ql = q.toLowerCase();
+    const list = GYM_LIST.filter(g => !draft.gyms.includes(g) && (!ql || g.toLowerCase().includes(ql)));
+    const exact = GYM_LIST.concat(draft.gyms).some(g => g.toLowerCase() === ql);
+    let h = list.slice(0, ql ? 8 : 6).map(g => `<button type="button" class="ob-chip" data-ob-gym="${esc(g)}">+ ${esc(g)}</button>`).join('');
+    if (q && !exact) h += `<button type="button" class="ob-chip add" data-ob-gym="${esc(q.slice(0, 40))}">+ Add “${esc(q.slice(0, 40))}”</button>`;
+    if (!q) h += `<div class="small muted" style="width:100%;margin-top:4px">Don’t see yours? Type the name and tap “Add”.</div>`;
+    return h;
+  }
+  function refreshGymUi() {
+    const s = $('#obGymSearch');
+    const p = $('#obGymPicked'); if (p) p.innerHTML = gymPickedHtml();
+    const r = $('#obGymResults'); if (r) r.innerHTML = gymResultsHtml(s ? s.value : '');
+    const btn = $('[data-ob="quiz-next"]'); if (btn) btn.disabled = !quizValid();
   }
 
   function renderTutorial() {
@@ -259,7 +307,7 @@
     const pct = Math.round(((tutorialI) / TIPS.length) * 100);
     let visual = '';
     if (t.demo === 'today') {
-      visual = `<div class="ob-vis hero gym"><div class="row between"><span class="tag">Good morning, ${esc(draft.name || 'rider')}</span><span class="pill gym">LA Fitness · 5am</span></div>
+      visual = `<div class="ob-vis hero gym"><div class="row between"><span class="tag">Good morning, ${esc(draft.name || 'athlete')}</span><span class="pill gym">${esc(draft.gyms[0] || (draft.homeGym ? 'Home gym' : 'Your gym'))} · 5am</span></div>
         <h2 style="margin-top:6px">Full Body A</h2>
         <div class="stats"><div><b>7</b>exercises</div><div><b>~60</b>min</div><div><b>0/18</b>sets</div></div>
         <div class="progress"><div style="width:8%"></div></div></div>`;
@@ -296,30 +344,21 @@
   }
 
   function applySchedulePreset() {
-    const train = draft.train;
-    const has = id => train.includes('mix') || train.includes(id);
-    const gym = has('gym'), home = has('home'), mt = has('muaythai');
-    if (train.includes('mix') || (gym && home && mt)) {
-      draft.scheduleDays = { mon: 'gym', tue: 'muaythai', wed: 'rest', thu: 'gym', fri: 'gym', sat: 'home', sun: 'home' };
-    } else if (gym && mt && !home) {
-      draft.scheduleDays = { mon: 'gym', tue: 'muaythai', wed: 'gym', thu: 'muaythai', fri: 'gym', sat: 'rest', sun: 'off' };
-    } else if (gym && home && !mt) {
-      draft.scheduleDays = { mon: 'gym', tue: 'home', wed: 'rest', thu: 'gym', fri: 'gym', sat: 'home', sun: 'off' };
-    } else if (mt && !gym && !home) {
-      draft.scheduleDays = { mon: 'rest', tue: 'muaythai', wed: 'home', thu: 'muaythai', fri: 'rest', sat: 'muaythai', sun: 'home' };
-    } else if (home && !gym && !mt) {
-      draft.scheduleDays = { mon: 'home', tue: 'home', wed: 'rest', thu: 'home', fri: 'home', sat: 'home', sun: 'off' };
-    } else if (gym && !home && !mt) {
-      draft.scheduleDays = { mon: 'gym', tue: 'rest', wed: 'gym', thu: 'rest', fri: 'gym', sat: 'off', sun: 'off' };
-    } else {
-      draft.scheduleDays = { mon: 'gym', tue: 'muaythai', wed: 'rest', thu: 'gym', fri: 'gym', sat: 'home', sun: 'home' };
-    }
+    const gym = draft.gyms.length > 0, home = draft.homeGym;
+    if (gym && home) draft.scheduleDays = { mon: 'gym', tue: 'home', wed: 'rest', thu: 'gym', fri: 'gym', sat: 'home', sun: 'off' };
+    else if (home) draft.scheduleDays = { mon: 'home', tue: 'home', wed: 'rest', thu: 'home', fri: 'home', sat: 'home', sun: 'off' };
+    else draft.scheduleDays = { mon: 'gym', tue: 'rest', wed: 'gym', thu: 'rest', fri: 'gym', sat: 'off', sun: 'off' };
+    DAYS.forEach(d => { if (!['gym', 'home'].includes(draft.scheduleDays[d])) draft.dayTimes[d] = ''; });
+  }
+
+  // Keep a seeded/edited week if it still matches where they train; otherwise rebuild it.
+  function scheduleFits() {
+    return DAYS.every(d => { const t = draft.scheduleDays[d]; return (t !== 'gym' || draft.gyms.length) && (t !== 'home' || draft.homeGym); });
   }
 
   function readOpenFields() {
     const n = $('#obName'); if (n) draft.name = n.value.trim();
-    const g = $('#obGymTime'); if (g) draft.times.gym = g.value;
-    const m = $('#obMtTime'); if (m) draft.times.muaythai = m.value;
+    $$('[data-ob-time]').forEach(i => { draft.dayTimes[i.dataset.obTime] = i.value; });
     const w = $('#obGoalWt'); if (w) draft.goalWeight = w.value.trim();
     const u = $('#obUnits'); if (u) draft.units = u.value;
   }
@@ -330,12 +369,14 @@
       name: draft.name.trim() || 'Athlete',
       goals: draft.goals.length ? draft.goals.slice() : ['general'],
       experience: draft.experience,
-      train: draft.train.slice(),
+      train: trainFromDraft(),
+      gyms: draft.gyms.slice(),
+      homeGym: !!draft.homeGym,
       sessionLength: +draft.sessionLength || 60,
       limitations: draft.limitations.filter(x => x !== 'none'),
       scheduleDays: Object.assign({}, draft.scheduleDays),
-      times: Object.assign({}, draft.times),
-      goalWeight: draft.goalWeight ? +draft.goalWeight : null,
+      dayTimes: Object.assign({}, draft.dayTimes),
+      goalWeight: +draft.goalWeight,
       units: draft.units || 'lb',
       tutorialDone: true
     });
@@ -359,12 +400,13 @@
       if (a === 'quiz-next') {
         readOpenFields();
         if (!quizValid()) return;
-        if (QUIZ[qi].id === 'train') applySchedulePreset();
+        if (QUIZ[qi].id === 'train' && !scheduleFits()) applySchedulePreset();
         if (qi < QUIZ.length - 1) { qi++; paint(); }
         else { step = 'tutorial'; tutorialI = 0; paint(); }
         return;
       }
       if (a === 'sched-preset') { applySchedulePreset(); paint(); return; }
+      if (a === 'toggle-home') { draft.homeGym = !draft.homeGym; ob.classList.toggle('on', draft.homeGym); refreshGymUi(); return; }
       if (a === 'tut-back') { if (tutorialI > 0) { tutorialI--; paint(); } return; }
       if (a === 'tut-next') {
         if (tutorialI < TIPS.length - 1) { tutorialI++; paint(); }
@@ -381,16 +423,12 @@
     }
     const ex = t.closest('[data-ob-exp]');
     if (ex) { draft.experience = ex.dataset.obExp; paint(); return; }
-    const tr = t.closest('[data-ob-train]');
-    if (tr) {
-      const id = tr.dataset.obTrain;
-      if (id === 'mix') draft.train = ['mix'];
-      else {
-        draft.train = draft.train.filter(x => x !== 'mix');
-        draft.train = draft.train.includes(id) ? draft.train.filter(x => x !== id) : draft.train.concat(id);
-        if (!draft.train.length) draft.train = [id];
-      }
-      paint(); return;
+    const gb = t.closest('[data-ob-gym]');
+    if (gb) {
+      const name = gb.dataset.obGym;
+      if (draft.gyms.includes(name)) draft.gyms = draft.gyms.filter(x => x !== name);
+      else if (draft.gyms.length < 5) { draft.gyms = draft.gyms.concat(name); const s = $('#obGymSearch'); if (s) s.value = ''; }
+      refreshGymUi(); return;
     }
     const len = t.closest('[data-ob-len]');
     if (len) { draft.sessionLength = +len.dataset.obLen; paint(); return; }
@@ -406,21 +444,35 @@
       paint(); return;
     }
     const day = t.closest('[data-ob-day]');
-    if (day) { draft.scheduleDays[day.dataset.obDay] = day.dataset.obDtype; paint(); return; }
+    if (day) {
+      readOpenFields();
+      const d = day.dataset.obDay, typ = day.dataset.obDtype;
+      draft.scheduleDays[d] = typ;
+      if (!['gym', 'home'].includes(typ)) draft.dayTimes[d] = '';
+      paint(); return;
+    }
   });
 
   document.addEventListener('input', e => {
-    if (e.target.id === 'obName') {
-      draft.name = e.target.value;
+    if (e.target.id === 'obName' || e.target.id === 'obGoalWt') {
+      if (e.target.id === 'obName') draft.name = e.target.value;
+      else draft.goalWeight = e.target.value.trim();
       const btn = $('[data-ob="quiz-next"]');
       if (btn) btn.disabled = !quizValid();
     }
+    if (e.target.id === 'obGymSearch') { const r = $('#obGymResults'); if (r) r.innerHTML = gymResultsHtml(e.target.value); }
   });
   document.addEventListener('change', e => {
-    if (e.target.id === 'obGymTime') draft.times.gym = e.target.value;
-    if (e.target.id === 'obMtTime') draft.times.muaythai = e.target.value;
+    if (e.target.dataset && e.target.dataset.obTime) draft.dayTimes[e.target.dataset.obTime] = e.target.value;
     if (e.target.id === 'obGoalWt') draft.goalWeight = e.target.value.trim();
-    if (e.target.id === 'obUnits') draft.units = e.target.value;
+    if (e.target.id === 'obUnits') { draft.units = e.target.value; const btn = $('[data-ob="quiz-next"]'); if (btn) btn.disabled = !quizValid(); }
+  });
+  // Enter in the gym search adds the top match (or the typed name)
+  document.addEventListener('keydown', e => {
+    if (e.target.id !== 'obGymSearch' || e.key !== 'Enter') return;
+    e.preventDefault();
+    const first = $('#obGymResults [data-ob-gym]');
+    if (e.target.value.trim() && first) first.click();
   });
 
   function start(opts) {

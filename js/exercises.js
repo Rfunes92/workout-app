@@ -25,7 +25,7 @@
   const ALL_IDS = Object.keys(EQUIPMENT);
 
   const PRESETS = {
-    gym: { label: 'LA Fitness (full commercial gym)', items: ALL_IDS.filter(id => !['heavy_bag', 'trx'].includes(id)) },
+    gym: { label: 'Full commercial gym', items: ALL_IDS.filter(id => !['heavy_bag', 'trx'].includes(id)) },
     muaythai: { label: 'Muay Thai gym', items: ['heavy_bag', 'jump_rope', 'mat', 'bands'] },
     home: { label: 'Home basics', items: ['dumbbells', 'bench_adjustable', 'bands', 'pullup_bar', 'mat'] },
     home_full: { label: 'Home – full garage gym', items: ['dumbbells', 'barbell', 'bench_adjustable', 'bench_flat', 'rack', 'pullup_bar', 'bands', 'kettlebells', 'cable', 'mat', 'jump_rope', 'foam_roller', 'plyo_box'] }
@@ -255,6 +255,8 @@
     ['Forearms under shoulders.', 'Straight line head to heels.', 'Squeeze glutes, tuck pelvis slightly.', 'Breathe; don\'t let hips sag.'], { unit: 'time' });
   E('dead_bug', 'Dead Bug', [], ['core'], 'deadbug', ['abs'], ['hip_flexors', 'obliques'], 'core',
     ['On back, arms up, knees at 90°.', 'Press lower back into floor.', 'Extend opposite arm and leg slowly.', 'Return, switch sides. Reps per side.']);
+  E('bird_dog', 'Bird Dog', [], ['core'], 'birddog', ['abs', 'lower_back'], ['glutes', 'obliques'], 'core',
+    ['Hands under shoulders, knees under hips.', 'Brace like someone’s about to poke your stomach.', 'Reach opposite arm and leg long — no hip tilt.', 'Pause 2s, return, switch. Reps per side.']);
   E('hanging_knee_raise', 'Hanging Knee Raise', ['pullup_bar|dip_station'], ['core'], 'kneeraise', ['abs', 'hip_flexors'], ['forearms', 'obliques'], 'core',
     ['Hang with shoulders engaged.', 'Curl knees toward chest, tilting pelvis.', 'No swinging.', 'Lower slowly.']);
   E('cable_crunch', 'Cable Crunch', ['cable'], ['core'], 'cablecrunch', ['abs'], ['obliques'], 'core',
@@ -284,7 +286,7 @@
   E('stairmaster', 'StairMaster Intervals', ['stairmaster|elliptical'], ['cardio'], 'run', ['glutes', 'quads'], ['calves', 'hamstrings'], 'cardio',
     ['Upright posture, light hands.', 'Alternate faster and easier pace.', 'Full foot on each step.', 'Push through heels for glutes.'], { unit: 'time' });
   E('jump_rope', 'Jump Rope Intervals', ['jump_rope'], ['cardio', 'mt'], 'jump', ['calves'], ['quads', 'front_delts', 'forearms'], 'cardio',
-    ['Small hops on balls of feet.', 'Turn with wrists, elbows in.', 'Alternate fast and easy rounds.', 'Great for Muay Thai footwork.'], { unit: 'time' });
+    ['Small hops on balls of feet.', 'Turn with wrists, elbows in.', 'Alternate fast and easy rounds.', 'Great for footwork and conditioning.'], { unit: 'time' });
   E('burpee', 'Burpees', [], ['cardio'], 'burpee', ['quads', 'chest'], ['glutes', 'front_delts', 'abs', 'triceps'], 'cardio',
     ['Squat down, hands to floor.', 'Jump feet back to plank.', 'Optional push-up.', 'Jump feet in and jump up.'], { unit: 'time' });
   E('jumping_jack', 'Jumping Jacks / High Knees', [], ['cardio'], 'jack', ['calves'], ['quads', 'side_delts', 'abductors'], 'cardio',

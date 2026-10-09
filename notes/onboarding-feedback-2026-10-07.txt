@@ -1,0 +1,28 @@
+Things to change:
+1. Welcome page says "Isaiah 40:31 · biker slang". We can remove that. This app is for customers who are in fitness or looking to get into fitness.
+2. I like where we are going with this "Mount Up is a coach in your pocket for people who lift at the gym, hit pads at Muay Thai, and still train when they’re home — without pretending life looks like a sterile app demo."   However, we can remove anything with Muay Thai. The reason we did this was because this app was meant for me. However, you did such a great job I can see the app being by used by anyone in fitness or getting into fitness. I noticed that fitness people want better ways to track their workouts other than a notebook. this can help. This also helps the people in the gym who find themselves not knowing what to do. So they either quit or spend time googling their next workout. 
+3. This part. 
+Eagle brand — rise with strength, not shame. <-- Leave it
+Posture-first demos — anatomical mannequins that teach how to stand the weight up. <--- Leave it
+Real mix — LA Fitness · home iron · Muay Thai, one plan. <---- Mix it up. Not everyone goes to LA Fitness or does Muay Thai.
+Warm, not cheesy — Christian & biker grit without the caption-energy. <--- I don't want to target only this group. 
+Food with flavor — macros that respect Latino plates (coming online as we ship it). <--- change this. Don't put us in a box.
+3. “They shall mount up with wings as eagles; they shall run, and not be weary.” — also what you say when it’s time to ride. <-- This started good but ended bad with the also what you say when it's time to ride. It puts us in a box towards bikers only. 
+4. What's the mission? This is good. But again remove they Muay Thai Stuff. 
+5. Where are you on the road? <---- This is great
+6. Where do you train? Mount Up mixes commercial gym, home iron, and Muay Thai — not a one-box clone.
+Let's change this up. What I would like to do is be able to choose your gym. Have Home Gym as an option. Then also a search bar that automatically pulls all of the gyms in their area and major gyms. For example I go to LA Fitness. Someone else might go to Planet Fitness, or Fusion Gyms. 
+7. How long can a gym/home session run?
+We’ll trim volume to fit. Class days stay light on purpose.
+30m
+45m
+60m
+75m
+90m
+Muay Thai class days stay short on purpose — this is for gym/home lifting blocks. <-- Another Muay Thai removal. 
+8. Sketch your week Tap each day. You can fine-tune times later in Setup.
+I really like this. However, Remove MT and make Gym Time an area where they can choose different times per the day they train. Example. I can go train today at 5am. But tomorrow I might only do 12pm. 
+9. Goal weight? (optional)
+Helps Food targets later. Skip if you’d rather not. Don't make it optional. We can create a weight tracking chart. 
+
+

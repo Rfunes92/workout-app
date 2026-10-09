@@ -401,6 +401,15 @@ html[data-theme="light"] .onboard::before{background:radial-gradient(120% 60% at
 .ob-sched-row{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px;align-items:center}
 .ob-sched-row .d{font-weight:800;font-size:13px}
 .ob-seg-sm button{padding:8px 0;font-size:12px}
+.ob-day-time{grid-column:2;padding:8px 10px;font-size:14px}
+.ob-qbody>.ob-opt{width:100%}
+.ob-gym-picked{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.ob-gym-picked:empty{display:none}
+.ob-gym-results{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ob-chip{background:var(--card);border:1.5px solid var(--line);border-radius:999px;color:var(--text);font:inherit;font-size:13px;font-weight:600;padding:7px 12px;cursor:pointer}
+.ob-chip.on{border-color:var(--accent);background:var(--tint)}
+.ob-chip.add{border-style:dashed}
+.ch-goal{stroke:var(--accent2);stroke-width:1.5;stroke-dasharray:5 4;fill:none}
 .ob-nav{display:flex;gap:10px;margin-top:18px;position:sticky;bottom:calc(10px + var(--safe-b))}
 .ob-nav .btn{flex:1;padding:13px 16px;font-size:15px}
 .ob-nav .btn:not(.ghost){flex:2}

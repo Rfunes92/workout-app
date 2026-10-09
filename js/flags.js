@@ -9,8 +9,8 @@
   // Catalog: unfinished / gated work. Admin can set each to off | beta | on.
   const CATALOG = {
     latino_food: {
-      label: 'Latino flavor-forward food',
-      desc: 'Recipes & searches that lean Mexican / Central American comfort — Phase 2 food work.',
+      label: 'Flavor-forward food',
+      desc: 'Recipes & searches built around real home cooking and comfort food — Phase 2 food work. (Flag key kept for config compatibility.)',
       default: 'off'
     },
     weekly_checkin: {

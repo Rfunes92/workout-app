@@ -266,20 +266,26 @@
       <div class="daytable">${rows.map(r => `<a href="#food" data-fa="goto" data-d="${r.d}" class="drow ${r.d === today ? 'today' : ''}"><span>${fmtD(r.d, { weekday: 'short', day: 'numeric' })}</span><span>${r.has ? kc(r.t.kcal) + ' kcal' : '<span class="muted">—</span>'}</span><span class="${r.has && r.t.p >= T.p ? 'ok' : ''}">${r.has ? r1(r.t.p) + ' g P' + (r.t.p >= T.p ? ' ✓' : '') : ''}</span></a>`).join('')}</div></div>`;
     const unit = (ui().getProfile() || {}).units || 'lb';
     const ws = Object.entries(st.weights).sort((a, b) => a[0] < b[0] ? -1 : 1);
+    const goalWt = +((ui().getProfile() || {}).goalWeight) || 0;
     h += `<div class="card"><h2>Weight</h2><div class="row" style="margin-top:8px"><input type="number" inputmode="decimal" step="0.1" id="wVal" placeholder="Weight (${unit})" class="grow" value="${esc(st.weights[todayIso()] || '')}"><input type="date" id="wDate" value="${todayIso()}" max="${todayIso()}" style="width:150px" aria-label="Weigh-in date"><button class="btn" data-fa="wsave">Save</button></div>
-      ${ws.length >= 2 ? weightChart(ws, unit) : `<div class="small muted" style="margin-top:10px">Log at least two weigh-ins to see your trend. Weigh in the morning, after the bathroom, before eating.</div>`}
+      ${goalWt ? `<div class="small muted" style="margin-top:8px">Goal: <b style="color:var(--text)">${goalWt} ${unit}</b>${ws.length ? ` · ${r1(Math.abs(ws[ws.length - 1][1] - goalWt))} ${unit} to go` : ''} <a href="#setup" class="linkbtn">edit</a></div>` : ''}
+      ${ws.length >= 2 ? weightChart(ws, unit, goalWt) : `<div class="small muted" style="margin-top:10px">Log at least two weigh-ins to see your trend. Weigh in the morning, after the bathroom, before eating.</div>`}
       ${ws.length ? `<div class="daytable" style="margin-top:8px">${ws.slice(-8).reverse().map(([d, w]) => `<div class="drow"><span>${fmtD(d, { month: 'short', day: 'numeric' })}</span><span><b>${w}</b> ${unit}</span><button class="linkbtn" data-fa="wdel" data-d="${d}" aria-label="Delete weigh-in">✕</button></div>`).join('')}</div>` : ''}</div>`;
     return h;
   }
-  function weightChart(ws, unit) {
+  function weightChart(ws, unit, goal) {
     const pts = ws.slice(-90).map(([d, w]) => ({ t: parse(d).getTime(), w: +w }));
     const W = 360, H = 160, pl = 34, pr = 8, pt = 10, pb = 22;
     const t0 = pts[0].t, t1 = Math.max(pts[pts.length - 1].t, t0 + 864e5);
-    const vals = pts.map(p => p.w); let lo = Math.min(...vals), hi = Math.max(...vals); if (hi - lo < 4) { const m = (hi + lo) / 2; lo = m - 2; hi = m + 2; }
+    const vals = pts.map(p => p.w); let lo = Math.min(...vals), hi = Math.max(...vals);
+    // Pull the goal into view when it's reasonably close, so the target line shows without flattening the trend.
+    if (goal > 0 && Math.abs(goal - (lo + hi) / 2) <= 40) { lo = Math.min(lo, goal); hi = Math.max(hi, goal); }
+    if (hi - lo < 4) { const m = (hi + lo) / 2; lo = m - 2; hi = m + 2; }
     const X = t => pl + (W - pl - pr) * (t - t0) / (t1 - t0), Y = v => pt + (H - pt - pb) * (1 - (v - lo) / (hi - lo));
     const trend = pts.map(p => { const win = pts.filter(q => q.t <= p.t && q.t > p.t - 7 * 864e5); return { t: p.t, w: win.reduce((a, q) => a + q.w, 0) / win.length }; });
     const line = arr => arr.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)},${Y(p.w).toFixed(1)}`).join(' ');
     let svg = [lo, (lo + hi) / 2, hi].map(v => `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" class="ch-grid"/><text x="${pl - 4}" y="${Y(v) + 3}" text-anchor="end" class="ch-lab">${r1(v)}</text>`).join('');
+    if (goal > 0 && goal >= lo && goal <= hi) svg += `<line x1="${pl}" x2="${W - pr}" y1="${Y(goal).toFixed(1)}" y2="${Y(goal).toFixed(1)}" class="ch-goal"/><text x="${W - pr}" y="${(Y(goal) - 3).toFixed(1)}" text-anchor="end" class="ch-lab">goal ${r1(goal)}</text>`;
     svg += `<path d="${line(pts)}" class="ch-wline"/><path d="${line(trend)}" class="ch-trend"/>`;
     svg += pts.map(p => `<circle cx="${X(p.t).toFixed(1)}" cy="${Y(p.w).toFixed(1)}" r="2.6" class="ch-dot"/>`).join('');
     svg += `<text x="${pl}" y="${H - 4}" class="ch-lab">${new Date(t0).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</text><text x="${W - pr}" y="${H - 4}" text-anchor="end" class="ch-lab">${new Date(t1).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</text>`;

@@ -11,7 +11,7 @@
     muscle: { label: 'Build muscle (size)', desc: 'More volume in the 6–12 rep range' },
     strength: { label: 'Strength', desc: 'Heavier main lifts, 4–6 reps, longer rests' },
     endurance: { label: 'Muscular endurance', desc: 'Higher reps, short rests' },
-    fight: { label: 'Muay Thai performance', desc: 'Conditioning, core rotation, hips' },
+    fight: { label: 'Athletic conditioning', desc: 'Conditioning, core rotation, hips — for sport and everyday athletes' },
     mobility: { label: 'Mobility / joint health', desc: 'Extra mobility in warm-ups' },
     general: { label: 'General health', desc: 'Balanced, sustainable training' }
   };
@@ -41,6 +41,8 @@
     knees: ['jump_rope', 'jumping_jack', 'burpee', 'box_jump'],
     shoulders: ['bb_ohp', 'arnold_press', 'band_dislocates']
   };
+  // When a limitation blocks a fixed-list item, swap in a safer move instead of leaving a gap (first one that fits wins).
+  const LIMIT_FALLBACK = { dead_bug: ['bird_dog', 'pallof_press'], glute_bridge: ['bird_dog'], banded_glute_bridge: ['bird_dog'] };
   let curBlocked = new Set();
   function blockedFor(state) {
     const s = new Set();
@@ -48,6 +50,10 @@
     return s;
   }
   const limOk = id => !curBlocked.has(id);
+  function safeId(id, set) {
+    if (limOk(id)) return id;
+    return (LIMIT_FALLBACK[id] || []).find(f => WO.EX_BY_ID[f] && limOk(f) && (!set || canDo(WO.EX_BY_ID[f], set))) || null;
+  }
 
   function equipSet(state, loc) {
     const l = state.locations[loc] || { equip: [] };
@@ -84,7 +90,7 @@
     let sets, reps, rest;
     if (ex.kind === 'mobility') return { sets: 1, reps: ex.unit === 'time' ? '45s' : '6–8/side', rest: 0 };
     if (ex.kind === 'core') {
-      sets = 3; reps = ex.unit === 'time' ? (ex.id === 'side_plank' ? '30s/side' : '30–45s') : (ex.id === 'dead_bug' || ex.id === 'pallof_press' ? '8–10/side' : '10–15'); rest = 30;
+      sets = 3; reps = ex.unit === 'time' ? (ex.id === 'side_plank' ? '30s/side' : '30–45s') : (ex.id === 'dead_bug' || ex.id === 'bird_dog' || ex.id === 'pallof_press' ? '8–10/side' : '10–15'); rest = 30;
     } else if (ex.id === 'farmer_carry') { sets = 3; reps = '40s walk'; rest = 60; }
     else if (isMain) {
       if (g('strength')) { sets = 4; reps = '5–6'; rest = 150; }
@@ -138,7 +144,7 @@
       if (sch.type === 'off') { sess.notes.push('Full rest. Hit your step goal and protein target.'); return sess; }
       sess.items.push(mk(WO.EX_BY_ID.incline_walk, { sets: 1, reps: '30–45 min easy (Zone 2)', rest: 0 }, { key: 'walk' }));
       ['cat_cow', 'worlds_greatest', 'hip_9090', 'open_book', 'couch_stretch', 'foam_roll'].forEach(id => {
-        const ex = WO.EX_BY_ID[id]; if (ex && canDo(ex, set) && limOk(id)) sess.items.push(mk(ex, presc(ex, false, goals), { key: id }));
+        const sid = safeId(id, set); const ex = sid && WO.EX_BY_ID[sid]; if (ex && canDo(ex, set)) sess.items.push(mk(ex, presc(ex, false, goals), { key: sid }));
       });
       sess.notes.push('Recovery day: easy movement only. Should feel better after than before.');
       sess.minutes = 45;
@@ -151,9 +157,10 @@
       ['worlds_greatest', 'hip_9090', 'ankle_rocks', 'open_book', 'band_pull_apart'].forEach(id => {
         const ex = WO.EX_BY_ID[id]; if (ex && canDo(ex, set) && limOk(id)) sess.warmup.push(mk(ex, presc(ex, false, goals), { key: 'w-' + id }));
       });
-      [['dead_bug', { sets: 2, reps: '8/side', rest: 30 }], ['side_plank', { sets: 2, reps: '20–30s/side', rest: 30 }], ['couch_stretch', { sets: 1, reps: '45s/side', rest: 0 }]].filter(([id]) => limOk(id)).forEach(([id, p]) => {
-        sess.items.push(mk(WO.EX_BY_ID[id], p, { key: id, note: 'Post-class' }));
-      });
+      [['dead_bug', { sets: 2, reps: '8/side', rest: 30 }], ['side_plank', { sets: 2, reps: '20–30s/side', rest: 30 }], ['couch_stretch', { sets: 1, reps: '45s/side', rest: 0 }]]
+        .map(([id, p]) => [safeId(id, set), p, id]).filter(([id]) => id).forEach(([id, p, orig]) => {
+          sess.items.push(mk(WO.EX_BY_ID[id], p, { key: id, note: id === orig ? 'Post-class' : 'Post-class · back-friendly swap' }));
+        });
       sess.minutes = 15;
       return sess;
     }

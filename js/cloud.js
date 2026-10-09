@@ -540,7 +540,7 @@ function onboardSummary() {
   const st = WO.ui && WO.ui.getState ? WO.ui.getState() : null;
   if (!st || !st.setupDone) return { onboarded: false };
   const p = st.profile || {};
-  return { onboarded: true, coach: { name: p.name || '', goals: st.goals || [], experience: p.experience || '', train: p.train || [], sessionLength: p.sessionLength || 60, limitations: p.limitations || [], goalWeight: p.goalWeight == null ? null : p.goalWeight, units: p.units || 'lb' } };
+  return { onboarded: true, coach: { name: p.name || '', goals: st.goals || [], experience: p.experience || '', train: p.train || [], gyms: p.gyms || [], homeGym: !!p.homeGym, sessionLength: p.sessionLength || 60, limitations: p.limitations || [], goalWeight: p.goalWeight == null ? null : p.goalWeight, units: p.units || 'lb' } };
 }
 async function touchProfile(user) {
   try {
@@ -628,7 +628,7 @@ WO.afterRoute.admin = async uid => {
     const P = p.exists() ? p.data() : {};
     const row = (k, v) => `<div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span class="muted">${k}</span><b>${v}</b></div>`;
     const C = P.coach || null, LIM = { flat_back: 'Back: lying flat', squat_back: 'Back: squatting', knees: 'Knees', shoulders: 'Shoulders overhead' };
-    const coachHtml = C ? `<div class="card flat"><h3>Coach quiz</h3>` + row('Goals', esc((C.goals || []).map(g => (WO.GOALS[g] || {}).label || g).join(', ') || '—')) + row('Experience', esc(C.experience || '—')) + row('Trains at', esc((C.train || []).join(', ') || '—')) + row('Session length', esc((C.sessionLength || '—') + ' min')) + row('Limitations', esc((C.limitations || []).map(l => LIM[l] || l).join(', ') || 'None')) + row('Goal weight', C.goalWeight ? esc(C.goalWeight + ' ' + (C.units || 'lb')) : '—') + `</div>` : `<div class="card flat small muted">Hasn't finished onboarding yet.</div>`;
+    const coachHtml = C ? `<div class="card flat"><h3>Coach quiz</h3>` + row('Goals', esc((C.goals || []).map(g => (WO.GOALS[g] || {}).label || g).join(', ') || '—')) + row('Experience', esc(C.experience || '—')) + row('Trains at', esc(((C.gyms || []).concat(C.homeGym ? ['Home gym'] : [])).join(', ') || (C.train || []).join(', ') || '—')) + row('Session length', esc((C.sessionLength || '—') + ' min')) + row('Limitations', esc((C.limitations || []).map(l => LIM[l] || l).join(', ') || 'None')) + row('Goal weight', C.goalWeight ? esc(C.goalWeight + ' ' + (C.units || 'lb')) : '—') + `</div>` : `<div class="card flat small muted">Hasn't finished onboarding yet.</div>`;
     box.innerHTML = `<div style="color:var(--text)"><a href="#admin" class="small">← All users</a><div style="margin-top:6px"><b style="font-size:16px">${esc(P.email || uid)}</b></div><div class="small muted">${esc(P.displayName || '')} · Joined ${fmtTs(P.createdAt)} · Active ${fmtTs(P.lastActive)}</div><div class="admin-detail"><div class="card flat"><h3>Activity</h3>`
       + row('Workout days completed', woDays) + row('Lifts with a logged weight', Object.keys(log).length) + row('Last lift logged', esc(lastLift || '—'))
       + row('Food days logged', fDays) + row('Food entries', entries) + row('Last food day', esc(lastFood || '—'))

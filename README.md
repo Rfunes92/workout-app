@@ -104,8 +104,8 @@ The rebrand changed **no** storage keys (`ronnieWorkout.v1`, `ronnieFood.v1`, `r
 
 ## Onboarding (Phase 1)
 First launch goes **sign in / create account (or use without account) → Welcome → coach quiz → tutorial → Today**. Code: `js/onboarding.js`, styles under "Onboarding" in `css/style.css`.
-- **Welcome:** explains what Mount Up is (Isaiah 40:31 + biker slang, eagle, posture-first mannequin demos, gym + home + Muay Thai mix).
-- **Quiz (8 steps):** name, goals, experience, where you train (LA Fitness / home / Muay Thai / mix), session length, limitations (back lying flat, back on squats, knees, shoulders), weekly schedule plus gym/Muay Thai times, and an optional goal weight with units.
+- **Welcome:** explains what Mount Up is — a coach in your pocket for anyone who lifts at the gym, trains at home, or is just getting started (eagle brand, posture-first mannequin demos, any gym + home).
+- **Quiz (8 steps):** name, goals, experience, where you train (searchable gym picker with a seeded list of major chains + type-your-own, plus a Home gym toggle; saved as `profile.gyms` / `profile.homeGym`), session length (30–90 min), limitations (back lying flat, back on squats, knees, shoulders), weekly schedule with a separate time per training day, and a required goal weight (drawn as the target line on Food → Weekly & weight). Legacy class days from before v16 still render but are no longer offered.
 - **Saved to** the workout state (`profile.experience/limitations/train/goalWeight/onboardedAt`, `goals`, `schedule`), which syncs through `users/{uid}/data/workout`. A summary also goes on `users/{uid}` (`onboarded`, `coach`) so Admin can see it.
 - **Limitations shape the plan:** `WO.LIMIT_BLOCK` in `planner.js` (for example, flat-back skips flat bench, DB fly, skull crushers, dead bugs and floor bridges; squat-back skips barbell/hack/Smith squats and deep squat holds). Swap can still pick those moves on purpose.
 - **Tutorial:** 5 short tips (Today, logging sets, form demo, rest timer, finishing the day).

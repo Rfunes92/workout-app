@@ -11,20 +11,21 @@
   const dayKeyOf = d => WO.DAYS[(d.getDay() + 6) % 7];
   function mondayOf(d) { const m = new Date(d.getFullYear(), d.getMonth(), d.getDate()); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m; }
   function dateForDay(day) { const m = mondayOf(new Date()); m.setDate(m.getDate() + WO.DAYS.indexOf(day)); return m; }
-  const LOC_TYPES = [['gym', 'LA Fitness'], ['muaythai', 'Muay Thai'], ['home', 'Home gym'], ['rest', 'Rest / active recovery'], ['off', 'Day off']];
+  // 'muaythai' is legacy (pre-v16 class days); only shown in Setup for people who already have one scheduled.
+  const LOC_TYPES = [['gym', 'Gym'], ['muaythai', 'Class day'], ['home', 'Home gym'], ['rest', 'Rest / active recovery'], ['off', 'Day off']];
 
   function defaults() {
     return {
       v: 1,
       setupDone: false,
       profile: {
-        name: 'Ronnie', units: 'lb', sessionLength: 60,
-        experience: 'some', limitations: [], train: ['mix'],
+        name: 'Athlete', units: 'lb', sessionLength: 60,
+        experience: 'some', limitations: [], train: ['gym', 'home'], gyms: [], homeGym: false,
         goalWeight: null, betaFeatures: false, tutorialDone: false
       },
       goals: ['fat_loss', 'sculpt'],
       locations: {
-        gym: { name: 'LA Fitness', equip: WO.PRESETS.gym.items.slice() },
+        gym: { name: 'My gym', equip: WO.PRESETS.gym.items.slice() },
         home: { name: 'Home gym', equip: WO.PRESETS.home.items.slice() },
         muaythai: { name: 'Muay Thai', equip: WO.PRESETS.muaythai.items.slice() }
       },
@@ -36,11 +37,12 @@
   }
   function defaultSchedule() {
     return {
-      mon: { type: 'gym', time: '05:00', focus: 'auto' }, tue: { type: 'muaythai', time: '18:00', focus: 'auto' },
+      mon: { type: 'gym', time: '05:00', focus: 'auto' }, tue: { type: 'home', time: '', focus: 'auto' },
       wed: { type: 'rest', time: '', focus: 'auto' }, thu: { type: 'gym', time: '09:30', focus: 'auto' },
       fri: { type: 'gym', time: '05:00', focus: 'auto' }, sat: { type: 'home', time: '', focus: 'auto' }, sun: { type: 'home', time: '', focus: 'auto' }
     };
   }
+  const usesLegacyClass = () => WO.DAYS.some(d => state && state.schedule && state.schedule[d] && state.schedule[d].type === 'muaythai');
   function load() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) { s = null; }
@@ -165,8 +167,8 @@
     if (s.cooldown && s.cooldown.length) {
       h += `<div class="section-h"><h2>Cool-down</h2><span class="small muted">~3 min</span></div><div class="card" style="padding:4px 12px">${s.cooldown.map(it => compactRow(day, it)).join('')}</div>`;
     }
-    if (isToday && WO.flags && WO.flags.isOn('weekly_checkin')) h += `<div class="card flat small beta-card"><span class="pill">Beta</span> <b>Weekly coach check-in</b><div class="muted" style="margin-top:4px">Sunday: how'd the week ride? Energy, sleep, weight. Coming together. Thanks for testing.</div></div>`;
-    if (isToday && WO.flags && WO.flags.isOn('latino_food')) h += `<div class="card flat small beta-card"><span class="pill">Beta</span> <b>Sazón mode</b><div class="muted" style="margin-top:4px">Macros that respect the plate: pupusas, carne asada, arroz y frijoles. Food previews land here first.</div></div>`;
+    if (isToday && WO.flags && WO.flags.isOn('weekly_checkin')) h += `<div class="card flat small beta-card"><span class="pill">Beta</span> <b>Weekly coach check-in</b><div class="muted" style="margin-top:4px">Sunday: how'd the week go? Energy, sleep, weight. Coming together. Thanks for testing.</div></div>`;
+    if (isToday && WO.flags && WO.flags.isOn('latino_food')) h += `<div class="card flat small beta-card"><span class="pill">Beta</span> <b>Flavor-forward food</b><div class="muted" style="margin-top:4px">Macros that fit the food you actually eat — home cooking, takeout, family recipes. Food previews land here first.</div></div>`;
     if (s.type === 'gym' || s.type === 'home') h += `<div class="card flat small"><b>Progressive overload</b><div class="muted" style="margin-top:4px">${esc(WO.OVERLOAD[1])}</div></div>`;
     if (!s.items.length && !s.warmup.length) h += `<div class="empty">Nothing scheduled. Enjoy the day off.</div>`;
     return h;
@@ -193,7 +195,7 @@
   let libFilter = { q: '', loc: 'all', muscle: '' };
   function renderLibrary() {
     setTop('Library', `${WO.EXERCISES.length} exercises`);
-    const opts = [['all', 'All exercises'], ['gym', 'Available at ' + state.locations.gym.name], ['home', 'Available at ' + state.locations.home.name], ['muaythai', 'Available at ' + state.locations.muaythai.name]];
+    const opts = [['all', 'All exercises'], ['gym', 'Available at ' + state.locations.gym.name], ['home', 'Available at ' + state.locations.home.name]].concat(usesLegacyClass() ? [['muaythai', 'Available at ' + state.locations.muaythai.name]] : []);
     let h = `<input type="search" id="libQ" placeholder="Search exercises…" value="${esc(libFilter.q)}" autocomplete="off">
       <div class="row" style="margin-top:8px"><select id="libLoc" class="grow">${opts.map(([v, l]) => `<option value="${v}" ${libFilter.loc === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
       <select id="libMus" class="grow"><option value="">All muscles</option>${Object.entries(WO.MUSCLES).map(([k, v]) => `<option value="${k}" ${libFilter.muscle === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
@@ -220,9 +222,11 @@
     const limTxt = (st.profile.limitations || []).map(k => limLabels[k] || k).join(' · ') || 'None';
     h += `<div class="card"><h2>Profile</h2>
       <label class="f">Name</label><input type="text" id="pName" value="${esc(st.profile.name)}">
-      <div class="row"><div class="grow"><label class="f">Session length (gym/home)</label><select id="pLen">${[30, 45, 60, 75, 90].map(m => `<option value="${m}" ${+st.profile.sessionLength === m ? 'selected' : ''}>${m} min</option>`).join('')}</select></div>
+      <div class="row"><div class="grow"><label class="f">Session length</label><select id="pLen">${[30, 45, 60, 75, 90].map(m => `<option value="${m}" ${+st.profile.sessionLength === m ? 'selected' : ''}>${m} min</option>`).join('')}</select></div>
       <div style="width:110px"><label class="f">Units</label><select id="pUnits">${['lb', 'kg'].map(u => `<option ${st.profile.units === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div>
-      <div class="small muted" style="margin-top:8px">Experience: <b style="color:var(--text)">${esc(st.profile.experience || '—')}</b> · Limits: <b style="color:var(--text)">${esc(limTxt)}</b>${st.profile.goalWeight ? ` · Goal wt: <b style="color:var(--text)">${esc(st.profile.goalWeight)} ${esc(st.profile.units)}</b>` : ''}</div></div>`;
+      <div class="row"><div class="grow"><label class="f">Goal weight (${esc(st.profile.units)})</label><input type="number" id="pGoalWt" inputmode="decimal" step="0.5" value="${esc(st.profile.goalWeight == null ? '' : st.profile.goalWeight)}"></div>
+      <a class="btn ghost sm" href="#food/progress" style="align-self:flex-end">📈 Weigh-ins</a></div>
+      <div class="small muted" style="margin-top:8px">Experience: <b style="color:var(--text)">${esc(st.profile.experience || '—')}</b> · Limits: <b style="color:var(--text)">${esc(limTxt)}</b>${(st.profile.gyms || []).length ? ` · Gyms: <b style="color:var(--text)">${esc(st.profile.gyms.join(', '))}</b>` : ''}${st.profile.homeGym ? ' · <b style="color:var(--text)">Home gym</b>' : ''}</div></div>`;
     // appearance
     const th = WO.theme ? WO.theme.get() : 'dark';
     h += `<div class="card"><h2>Appearance</h2><div class="small muted" style="margin:2px 0 8px">System follows your phone's light/dark setting.</div>
@@ -233,7 +237,7 @@
       <button type="button" class="btn block" id="redoOnboard">Redo onboarding</button></div>`;
     h += `<div class="card"><div class="row between"><h2>Beta features</h2><span class="pill ${betaOn ? 'rest' : ''}">${betaOn ? 'On' : 'Off'}</span></div>
       <div class="small muted" style="margin:2px 0 10px">Off by default. Turns on unfinished experiments on <b>this device</b> (ones Admin marked as Beta). Live features stay on for everyone.</div>
-      <label class="eq ${betaOn ? 'on' : ''}" id="betaToggle" style="cursor:pointer"><span class="box"></span><div><b>Enable beta features</b><div class="small muted">Latino food previews, desktop shell experiments, and other gated work.</div></div></label>
+      <label class="eq ${betaOn ? 'on' : ''}" id="betaToggle" style="cursor:pointer"><span class="box"></span><div><b>Enable beta features</b><div class="small muted">Food previews, desktop shell experiments, and other gated work.</div></div></label>
       ${WO.flags ? `<div class="small muted" style="margin-top:10px">Flag status: ${Object.keys(WO.flags.CATALOG).map(k => `${WO.flags.CATALOG[k].label.split('(')[0].trim()} <b style="color:var(--text)">${WO.flags.modeOf(k)}</b>${WO.flags.isOn(k) ? ' ✓' : ''}`).join(' · ')}</div>` : ''}</div>`;
     h += `<div class="card"><h2>App looks tiny / zoomed out?</h2><div class="small muted" style="margin-bottom:8px">On Android Chrome, clear the offline cache so the latest layout fix loads. Your workouts and food log stay on this device.</div>
       <button class="btn block" id="resetLayout">Reset layout / clear offline cache</button></div>`;
@@ -243,16 +247,16 @@
     // schedule
     h += `<div class="card"><div class="row between"><h2>Weekly schedule</h2><button class="btn sm ghost" id="schedReset">Reset</button></div>
       ${WO.DAYS.map(d => { const s = st.schedule[d]; const train = s.type === 'gym' || s.type === 'home'; return `<div class="sched-row"><div class="d">${WO.DAY_NAMES[d].slice(0, 3)}</div>
-        <select data-sched="${d}" data-f="type">${LOC_TYPES.map(([v, l]) => `<option value="${v}" ${s.type === v ? 'selected' : ''}>${esc(v === 'gym' ? st.locations.gym.name : v === 'home' ? st.locations.home.name : v === 'muaythai' ? st.locations.muaythai.name : l)}</option>`).join('')}</select>
+        <select data-sched="${d}" data-f="type">${LOC_TYPES.filter(([v]) => v !== 'muaythai' || s.type === 'muaythai').map(([v, l]) => `<option value="${v}" ${s.type === v ? 'selected' : ''}>${esc(v === 'gym' ? st.locations.gym.name : v === 'home' ? st.locations.home.name : v === 'muaythai' ? st.locations.muaythai.name : l)}</option>`).join('')}</select>
         <input type="time" data-sched="${d}" data-f="time" value="${esc(s.time)}">
         ${train ? `<select class="focus" data-sched="${d}" data-f="focus">${WO.FOCUS_OPTIONS.map(([v, l]) => `<option value="${v}" ${s.focus === v ? 'selected' : ''}>Focus: ${l}${v === 'auto' ? ' (' + WO.TEMPLATES[getAutoFocus(d)].title + ')' : ''}</option>`).join('')}</select>` : ''}</div>`; }).join('')}</div>`;
     // equipment
     const L = st.locations[setupLoc];
     const set = WO.equipSet(st, setupLoc);
     const n = WO.available(set).length;
-    const presetBtns = setupLoc === 'gym' ? [['gym', 'LA Fitness preset']] : setupLoc === 'home' ? [['home', 'Home basics'], ['home_full', 'Full garage gym']] : [['muaythai', 'Muay Thai preset']];
+    const presetBtns = setupLoc === 'gym' ? [['gym', 'Commercial gym preset']] : setupLoc === 'home' ? [['home', 'Home basics'], ['home_full', 'Full garage gym']] : [['muaythai', 'Muay Thai preset']];
     h += `<div class="card" id="equipCard"><h2>Equipment</h2><div class="small muted" style="margin-bottom:8px">Workouts only use exercises whose equipment is checked for that location.</div>
-      <div class="seg">${[['gym', st.locations.gym.name], ['home', st.locations.home.name], ['muaythai', st.locations.muaythai.name]].map(([k, l]) => `<button data-sloc="${k}" class="${setupLoc === k ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>
+      <div class="seg">${[['gym', st.locations.gym.name], ['home', st.locations.home.name]].concat(usesLegacyClass() || setupLoc === 'muaythai' ? [['muaythai', st.locations.muaythai.name]] : []).map(([k, l]) => `<button data-sloc="${k}" class="${setupLoc === k ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>
       <label class="f">Location name</label><input type="text" id="locName" value="${esc(L.name)}">
       <div class="row wrap" style="margin-top:10px">${presetBtns.map(([k, l]) => `<button class="btn sm" data-preset="${k}">${esc(l)}</button>`).join('')}<button class="btn sm ghost" data-preset="clear">Clear all</button><span class="small muted grow" style="text-align:right"><b style="color:var(--text)">${n}</b> exercises available</span></div>
       ${WO.EQUIPMENT_GROUPS.map(g => `<div class="eq-group"><div class="tag">${g.group}</div><div class="eq-grid">${g.items.map(([id, label]) => `<label class="eq ${L.equip.includes(id) ? 'on' : ''}" data-eq="${id}"><span class="box"></span>${esc(label)}</label>`).join('')}</div></div>`).join('')}
@@ -292,7 +296,7 @@
     let item = null;
     if (ctx) { item = findItem(ctx.split('|')[0], ctx.split('|')[1]).it; }
     const reqTxt = ex.req.length ? ex.req.map(r => r.split('|').map(x => WO.EQUIPMENT[x].label).join(' or ')).join(' + ') : 'Bodyweight only';
-    const whereOk = ['gym', 'home', 'muaythai'].filter(l => WO.canDo(ex, WO.equipSet(state, l))).map(l => state.locations[l].name);
+    const whereOk = ['gym', 'home'].concat(usesLegacyClass() ? ['muaythai'] : []).filter(l => WO.canDo(ex, WO.equipSet(state, l))).map(l => state.locations[l].name);
     const tip = ex.kind === 'mobility' ? 'Move slowly and breathe; aim for a little more range each time.' : ex.kind === 'cardio' ? 'Progress by adding a round, a little speed/incline/resistance, or shortening the easy interval.' :
       ex.req.length === 0 || ex.req.every(r => r === 'bands') ? 'Progress: add reps, slow the lowering to 3s, add a pause, or use a harder variation/band.' :
       `Progress: when you hit the top of the rep range on all sets, add ${/quads|glutes|hamstrings/.test(ex.primary.join()) ? '5–10' : '2.5–5'} ${state.profile.units === 'kg' ? 'lb (~1–2.5 kg)' : 'lb'} next session.`;
@@ -457,7 +461,8 @@
     if (t.dataset.sched) { const s = state.schedule[t.dataset.sched]; s[t.dataset.f] = t.value; if (t.dataset.f === 'type' && !['gym', 'home'].includes(t.value)) s.focus = 'auto'; save(); rerender(true); return; }
     if (t.id === 'pName') { state.profile.name = t.value.trim(); save(); return; }
     if (t.id === 'pLen') { state.profile.sessionLength = +t.value; save(); rerender(true); return; }
-    if (t.id === 'pUnits') { state.profile.units = t.value; save(); return; }
+    if (t.id === 'pUnits') { state.profile.units = t.value; save(); rerender(true); return; }
+    if (t.id === 'pGoalWt') { const v = parseFloat(t.value); state.profile.goalWeight = v > 0 ? Math.round(v * 10) / 10 : null; save(); return; }
     if (t.id === 'locName') { state.locations[setupLoc].name = t.value.trim() || state.locations[setupLoc].name; save(); rerender(true); return; }
     if (t.dataset.wt) { const v = t.value.trim(); if (v) { state.log[t.dataset.wt] = { w: v, d: iso(new Date()) }; save(); t.placeholder = v; } return; }
     if (t.id === 'libLoc') { libFilter.loc = t.value; renderLibList(); return; }
@@ -485,7 +490,10 @@
     state.profile.units = d.units || state.profile.units;
     state.profile.experience = d.experience || 'some';
     state.profile.limitations = Array.isArray(d.limitations) ? d.limitations.slice() : [];
-    state.profile.train = Array.isArray(d.train) ? d.train.slice() : ['mix'];
+    state.profile.train = Array.isArray(d.train) && d.train.length ? d.train.slice() : ['gym'];
+    state.profile.gyms = Array.isArray(d.gyms) ? d.gyms.slice(0, 5) : [];
+    state.profile.homeGym = !!d.homeGym;
+    if (state.profile.gyms.length) state.locations.gym.name = state.profile.gyms.length > 1 ? state.profile.gyms.slice(0, 2).join(' / ') : state.profile.gyms[0];
     state.profile.goalWeight = d.goalWeight != null && d.goalWeight !== '' ? +d.goalWeight : null;
     state.profile.tutorialDone = !!d.tutorialDone;
     state.profile.onboardedAt = new Date().toISOString();
@@ -495,10 +503,8 @@
         const typ = d.scheduleDays[day] || 'rest';
         state.schedule[day] = state.schedule[day] || { type: 'rest', time: '', focus: 'auto' };
         state.schedule[day].type = typ;
-        if (typ === 'gym') state.schedule[day].time = (d.times && d.times.gym) || state.schedule[day].time || '05:00';
-        else if (typ === 'muaythai') state.schedule[day].time = (d.times && d.times.muaythai) || state.schedule[day].time || '18:00';
-        else if (typ === 'home') state.schedule[day].time = (d.times && d.times.home) || '';
-        else state.schedule[day].time = '';
+        // Per-day training time (Mon 5am, Tue noon…); blank is fine.
+        state.schedule[day].time = ['gym', 'home'].includes(typ) ? ((d.dayTimes && d.dayTimes[day]) || '') : '';
         if (!['gym', 'home'].includes(typ)) state.schedule[day].focus = 'auto';
       });
     }
