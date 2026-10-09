@@ -1,0 +1,16 @@
+<!doctype html><html data-theme="dark"><head><meta charset="utf-8"><title>Mount Up demo gallery</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>body{padding:12px;overflow:auto!important}.g{display:grid;grid-template-columns:repeat(var(--cols,6),1fr);gap:8px}.c{background:var(--bg2);border-radius:10px;padding:4px;font:11px system-ui;color:var(--text)}.c .demo{margin:0}.c b{display:block;padding:2px 4px}.c.stick b{color:#f55}</style></head>
+<body><div id="sum" style="color:var(--text);font:14px system-ui;margin-bottom:8px"></div><div class="g" id="g"></div>
+<script src="../js/exercises.js"></script><script src="../js/demo.js"></script><script src="../js/mannequin.js"></script>
+<script>
+const qs=new URLSearchParams(location.search),only=qs.get('ids'),fig=qs.get('fig'),t=qs.get('t');
+if(qs.get('cols'))document.documentElement.style.setProperty('--cols',qs.get('cols'));
+if(fig&&WO.setFigure)WO.setFigure(fig);if(t!=null)WO.MANNEQUIN.freeze=(t==='key'?'key':+t);
+let list=WO.EXERCISES;if(only)list=only.split(',').map(i=>WO.EX_BY_ID[i]);if(qs.get('from'))list=list.slice(+qs.get('from'),+qs.get('to'));
+const stick=[];
+list.forEach(ex=>{const c=document.createElement('div');c.className='c';c.innerHTML='<div class="demo"></div><b>'+ex.name+' <small>('+ex.id+')</small></b>';g.appendChild(c);
+ WO.mountDemo(c.querySelector('.demo'),ex);if(!c.querySelector('svg.mq')){c.classList.add('stick');stick.push(ex.id);}
+});
+sum.textContent=list.length+' exercises · stick fallback: '+stick.length+' '+stick.join(' ');
+</script></body></html>

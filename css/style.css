@@ -358,6 +358,13 @@ html[data-theme="light"]{--mq-hi:#d9dfe7;--mq-lo:#8e9aab;--mq-far:#c4cbd5;--mq-l
 .mq .mq-arc{fill:none;stroke:var(--accent2);stroke-width:1.2}.mq .mq-deg{font:700 6px system-ui,sans-serif;fill:var(--accent2)}
 .mq .mq-cue rect{fill:var(--bg2);stroke:var(--accent);stroke-width:.8}.mq .mq-cue text{font:700 7px system-ui,sans-serif;fill:var(--text)}
 .mq .mq-note{font:700 6px system-ui,sans-serif;fill:var(--muted);letter-spacing:.12em}
+:root{--mq-hair:#3a2c22;--mq-plate:#2a3038}html[data-theme="light"]{--mq-hair:#4a3a2c;--mq-plate:#3a424d}
+.mq .mq-hair{fill:var(--mq-hair);stroke:var(--mq-line);stroke-width:.5;stroke-linejoin:round}
+.mq .mq-plate{fill:var(--mq-plate);stroke:var(--mq-line);stroke-width:.8}
+.mq .mq-pulley{fill:var(--mq-db);stroke:var(--mq-line);stroke-width:.6}
+.mq .mq-pad{stroke:var(--mq-db);stroke-linecap:round}
+.mq .cable{stroke-width:1.2}.mq .band{stroke-width:2.2}
+.fig-seg{margin:-4px 0 10px}.fig-seg button{font-size:12px;padding:6px 4px}
 
 /* ---------- Onboarding (js/onboarding.js): welcome → quiz → tutorial ---------- */
 .onboard{position:fixed;inset:0;z-index:65;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}

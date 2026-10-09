@@ -21,7 +21,7 @@
       profile: {
         name: 'Athlete', units: 'lb', sessionLength: 60,
         experience: 'some', limitations: [], train: ['gym', 'home'], gyms: [], homeGym: false,
-        goalWeight: null, betaFeatures: false, tutorialDone: false
+        goalWeight: null, betaFeatures: false, tutorialDone: false, demoFigure: 'male'
       },
       goals: ['fat_loss', 'sculpt'],
       locations: {
@@ -61,6 +61,11 @@
     return out;
   }
   let state = load();
+  // demo figure (male/female) is per user: stored in the namespaced workout profile, which also syncs to the cloud
+  const applyFigure = () => { if (WO.setFigure) WO.setFigure(state.profile.demoFigure === 'female' ? 'female' : 'male'); };
+  applyFigure();
+  const figSeg = () => { const f = WO.getFigure ? WO.getFigure() : 'male';
+    return `<div class="seg fig-seg" role="radiogroup" aria-label="Demo figure">${[['male', '♂ Male'], ['female', '♀ Female']].map(([k, l]) => `<button type="button" role="radio" aria-checked="${f === k}" class="${f === k ? 'on' : ''}" data-fig-set="${k}">${l}</button>`).join('')}</div>`; };
   function save() {
     // prune done-logs older than 21 days
     const cutoff = iso(new Date(Date.now() - 21 * 864e5));
@@ -230,7 +235,8 @@
     // appearance
     const th = WO.theme ? WO.theme.get() : 'dark';
     h += `<div class="card"><h2>Appearance</h2><div class="small muted" style="margin:2px 0 8px">System follows your phone's light/dark setting.</div>
-      <div class="seg theme-seg" role="radiogroup" aria-label="Appearance">${[['light', '☀️ Light'], ['dark', '🌙 Dark'], ['system', '📱 System']].map(([k, l]) => `<button type="button" role="radio" aria-checked="${th === k}" class="${th === k ? 'on' : ''}" data-theme-set="${k}">${l}</button>`).join('')}</div></div>`;
+      <div class="seg theme-seg" role="radiogroup" aria-label="Appearance">${[['light', '☀️ Light'], ['dark', '🌙 Dark'], ['system', '📱 System']].map(([k, l]) => `<button type="button" role="radio" aria-checked="${th === k}" class="${th === k ? 'on' : ''}" data-theme-set="${k}">${l}</button>`).join('')}</div>
+      <label class="f" style="margin-top:12px">Exercise demo figure</label><div class="small muted" style="margin:0 0 8px">Default is a muscular male mannequin. Saved to your account.</div>${figSeg()}</div>`;
     const betaOn = !!(st.profile.betaFeatures);
     h += `<div class="card"><h2>Coach setup</h2>
       <div class="small muted" style="margin-bottom:8px">Redo the welcome, quiz, and tutorial anytime. Your lift log and food stay put — only the plan preferences get rebuilt.</div>
@@ -302,6 +308,7 @@
       `Progress: when you hit the top of the rep range on all sets, add ${/quads|glutes|hamstrings/.test(ex.primary.join()) ? '5–10' : '2.5–5'} ${state.profile.units === 'kg' ? 'lb (~1–2.5 kg)' : 'lb'} next session.`;
     const html = `<div class="sheet-head"><div><div class="tag">${esc(ex.kind)}${item ? ' · ' + item.sets + ' × ' + esc(item.reps) : ''}</div><h1 style="font-size:23px;margin-top:4px">${esc(ex.name)}</h1></div><button class="close-x" data-close aria-label="Close">✕</button></div>
       <div class="demo" data-demo="${ex.id}"></div>
+      ${figSeg()}
       <div class="row" style="gap:8px"><a class="btn ghost grow" href="${ytLink(ex)}" target="_blank" rel="noopener">▶ Watch demo (YouTube)</a>${ctx && item && item.slot ? `<button class="btn ghost" data-swap="${esc(ctx)}">⇄ Swap</button>` : ''}</div>
       <div class="section-h"><h2>Muscles worked</h2></div>
       ${WO.bodyMap(ex.primary, ex.secondary)}
@@ -404,6 +411,8 @@
       return;
     }
     // setup interactions
+    const fs = t.closest('[data-fig-set]');
+    if (fs) { state.profile.demoFigure = fs.dataset.figSet === 'female' ? 'female' : 'male'; save(); applyFigure(); return; }
     const ts = t.closest('[data-theme-set]');
     if (ts && WO.theme) { WO.theme.set(ts.dataset.themeSet); ts.parentElement.querySelectorAll('button').forEach(b => { const on = b === ts; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); return; }
     const g = t.closest('[data-goal]');
@@ -468,7 +477,7 @@
     if (t.id === 'libLoc') { libFilter.loc = t.value; renderLibList(); return; }
     if (t.id === 'libMus') { libFilter.muscle = t.value; renderLibList(); return; }
     if (t.id === 'importFile' && t.files[0]) {
-      t.files[0].text().then(txt => { const d = JSON.parse(txt); if (d && d.v === 1) { if (d.food && WO.food) WO.food.importData(d.food); delete d.food; if (d.theme && WO.theme) WO.theme.set(d.theme); delete d.theme; localStorage.setItem(KEY, JSON.stringify(d)); state = load(); week = null; rerender(); } else alert('Not a valid backup file.'); }).catch(() => alert('Could not read that file.'));
+      t.files[0].text().then(txt => { const d = JSON.parse(txt); if (d && d.v === 1) { if (d.food && WO.food) WO.food.importData(d.food); delete d.food; if (d.theme && WO.theme) WO.theme.set(d.theme); delete d.theme; localStorage.setItem(KEY, JSON.stringify(d)); state = load(); applyFigure(); week = null; rerender(); } else alert('Not a valid backup file.'); }).catch(() => alert('Could not read that file.'));
     }
   });
   document.addEventListener('input', e => { if (e.target.id === 'libQ') { libFilter.q = e.target.value; renderLibList(); } });
@@ -526,7 +535,7 @@
     getProfile: () => state.profile,
     getState: () => state,
     mountDemos,
-    reloadState: () => { state = load(); week = null; },
+    reloadState: () => { state = load(); applyFigure(); week = null; },
     applyOnboarding,
     setBetaFlag: (on) => { state.profile.betaFeatures = !!on; save(); }
   };

@@ -27,7 +27,7 @@ Push this folder (repo root or `/docs`) and enable Pages. All paths are relative
 - `js/exercises.js` – equipment catalog, presets, muscles, exercise library
 - `js/planner.js` – weekly plan generator, goals, sets/reps/rest, finishers, overload guidance
 - `js/bodymap.js` – front/back SVG muscle map
-- `js/demo.js` – animated stick-figure demos (one per movement pattern)
+- `js/mannequin.js` – anatomical mannequin posture demos for every exercise (muscular male / female figure, side + front/back views, posture overlay, phased cues, muscle highlight). `node tools/check_demos.js` verifies every exercise has a rig.
 - `js/app.js` – state, routing (`#today`, `#week`, `#library`, `#setup`, `#day/mon`, `#ex/<id>`), UI
 - `sw.js` – offline cache (network-first)
 - `manifest.webmanifest`, `icons/` – Add to Home Screen
