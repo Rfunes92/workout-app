@@ -32,6 +32,12 @@ Push this folder (repo root or `/docs`) and enable Pages. All paths are relative
 - `sw.js` – offline cache (network-first)
 - `manifest.webmanifest`, `icons/` – Add to Home Screen
 
+## Tablet & desktop layout (v21)
+Phones (<768px) keep the original mobile layout. Wider screens get their own layout (all rules in the v21 block at the end of `css/style.css`, scoped to `html:not([data-mu-vp])` so a phone whose viewport was rewritten by the inline Android/iPhone fix never picks them up):
+- **768–899px (tablet):** the tab bar becomes a compact left icon rail, content fills the width, sheets open as centered dialogs, Setup uses two columns, Admin gets a compact sidebar.
+- **≥900px (desktop):** labeled left sidebar; content fills the screen (cap 1400px). Today = hero + day strip on top, workout cards on the left, warm-up / cool-down / notes on the right. Exercise details open as a wide two-column dialog (demo left, muscles + cues right). Setup = 2 columns (3 at ≥1360px). Admin = full-width content, users and test-feedback items as multi-column card grids.
+- Screenshots: `node tools/desktop_shots.mjs http://localhost:8000 /tmp/shots 1280 800` (Node 22+, google-chrome). Admin pages are previewed with mock users and the local test-feedback list (no sign-in). Before/after set in `screenshots/desktop-v21/`.
+
 ## Food & macro tracker (Food tab)
 A Lose It!-style tracker that lives in the same app (`#food`, `#food/progress`, `#food/goals`).
 

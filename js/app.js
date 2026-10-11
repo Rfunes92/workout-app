@@ -209,27 +209,33 @@
       ${isToday ? todayLocCtl(day, s) : ''}
       ${WO.session && WO.flags.isOn('session_player') && allItems.length ? `<div class="row" style="gap:8px;margin-top:12px"><button type="button" class="btn ghost sm grow" data-sess-preview="${day}">👁 Preview</button><button type="button" class="btn sm grow" data-sess-start="${day}">▶ ${pct ? 'Continue' : 'Start'} session</button></div>` : ''}</div>`;
     if (WO.session && WO.flags.isOn('session_player')) h = h.replace(dayStrip(day), dayStrip(day) + WO.session.bannerHtml(day));
-    s.notes.forEach(n => { h += `<div class="note">${esc(n)}</div>`; });
+    h += `<div class="day-body">`;
+    if (s.notes.length) h += `<div class="day-sec day-notes">${s.notes.map(n => `<div class="note">${esc(n)}</div>`).join('')}</div>`;
     if (s.warmup.length) {
-      h += `<div class="section-h"><h2>${s.type === 'muaythai' ? 'Pre-class mobility' : 'Warm-up'}</h2><span class="small muted">${s.type === 'muaythai' ? '~8 min' : '~6 min'}</span></div>`;
+      h += `<section class="day-sec day-warm"><div class="section-h"><h2>${s.type === 'muaythai' ? 'Pre-class mobility' : 'Warm-up'}</h2><span class="small muted">${s.type === 'muaythai' ? '~8 min' : '~6 min'}</span></div>`;
       if (s.warmupText) h += `<div class="small muted" style="margin:0 2px">${esc(s.warmupText)}</div>`;
       h += `<div class="card" style="padding:4px 12px">${s.warmup.map(it => compactRow(day, it)).join('')}</div>`;
       if (s.warmup.some(it => it.warm)) h += `<div class="small muted" style="margin:4px 2px 0">Warm-up swaps only show moves your ${esc(s.locName)} equipment supports${(state.profile.limitations || []).length ? ' and your no-go zones allow' : ''}.</div>`;
+      h += `</section>`;
     }
+    if (s.items.length || s.finisher) h += `<section class="day-sec day-main">`;
     if (s.items.length) {
       h += `<div class="section-h"><h2>${s.type === 'muaythai' ? 'After class (optional)' : s.type === 'rest' ? 'Recovery' : 'Workout'}</h2>${s.items.some(i => i.group) ? '<span class="small muted">A1/A2 = superset</span>' : ''}</div>`;
-      s.items.forEach(it => { h += itemCard(day, it, { noSwap: s.type === 'rest' || s.type === 'muaythai' }); });
+      h += `<div class="ex-list">${s.items.map(it => itemCard(day, it, { noSwap: s.type === 'rest' || s.type === 'muaythai' })).join('')}</div>`;
     }
     if (s.finisher) {
       h += `<div class="section-h"><h2>🔥 Fat-loss finisher</h2></div>`;
-      h += itemCard(day, s.finisher, { noWeight: true });
+      h += `<div class="ex-list">${itemCard(day, s.finisher, { noWeight: true })}</div>`;
     }
+    if (s.items.length || s.finisher) h += `</section>`;
     if (s.cooldown && s.cooldown.length) {
-      h += `<div class="section-h"><h2>Cool-down</h2><span class="small muted">~3 min</span></div><div class="card" style="padding:4px 12px">${s.cooldown.map(it => compactRow(day, it)).join('')}</div>`;
+      h += `<section class="day-sec day-cool"><div class="section-h"><h2>Cool-down</h2><span class="small muted">~3 min</span></div><div class="card" style="padding:4px 12px">${s.cooldown.map(it => compactRow(day, it)).join('')}</div></section>`;
     }
+    h += `<div class="day-sec day-extra">`;
     if (isToday && WO.flags && WO.flags.isOn('weekly_checkin')) h += `<div class="card flat small beta-card"><span class="pill">Beta</span> <b>Weekly coach check-in</b><div class="muted" style="margin-top:4px">Sunday: how'd the week go? Energy, sleep, weight. Coming together. Thanks for testing.</div></div>`;
     if (isToday && WO.flags && WO.flags.isOn('latino_food')) h += `<div class="card flat small beta-card"><span class="pill">Beta</span> <b>Flavor-forward food</b><div class="muted" style="margin-top:4px">Macros that fit the food you actually eat — home cooking, takeout, family recipes. Food previews land here first.</div></div>`;
     if (s.type === 'gym' || s.type === 'home') h += `<div class="card flat small"><b>Progressive overload</b><div class="muted" style="margin-top:4px">${esc(WO.OVERLOAD[1])}</div></div>`;
+    h += `</div></div>`;
     if (!s.items.length && !s.warmup.length) h += `<div class="empty">Nothing scheduled. Enjoy the day off.</div>`;
     return h;
   }
@@ -352,7 +358,8 @@
 
   // ---------- exercise sheet ----------
   let sheetCtx = null, lastCoachEx = null;
-  function openSheet(html) {
+  function openSheet(html, size) {
+    $('.sheet-panel').classList.toggle('wide', size === 'wide'); // desktop: wide two-column exercise sheet
     $('#sheetBody').innerHTML = html; $('#sheet').classList.remove('hidden'); document.body.style.overflow = 'hidden';
     $('.sheet-panel').scrollTop = 0; mountDemos($('#sheetBody'));
   }
@@ -375,12 +382,12 @@
       `Progress: when you hit the top of the rep range on all sets, add ${/quads|glutes|hamstrings/.test(ex.primary.join()) ? '5–10' : '2.5–5'} ${state.profile.units === 'kg' ? 'lb (~1–2.5 kg)' : 'lb'} next session.`;
     const coach = WO.flags && WO.flags.isOn('coach_mode') && WO.MANNEQUIN;
     const html = `<div class="sheet-head"><div><div class="tag">${esc(ex.kind)}${item ? ' · ' + item.sets + ' × ' + esc(item.reps) : ''}</div><h1 style="font-size:23px;margin-top:4px">${esc(ex.name)}</h1></div><button class="close-x" data-close aria-label="Close">✕</button></div>
-      <div class="demo" ${coach ? `data-coach-demo="${ex.id}"` : `data-demo="${ex.id}"`}></div>
+      <div class="sheet-cols"><div class="sheet-l"><div class="demo" ${coach ? `data-coach-demo="${ex.id}"` : `data-demo="${ex.id}"`}></div>
       ${coach ? coachControls(ex) : ''}
       ${figSeg()}
       ${coach ? mistakePanel(ex) : ''}
-      <div class="row" style="gap:8px"><a class="btn ghost grow" href="${ytLink(ex)}" target="_blank" rel="noopener">▶ Watch demo (YouTube)</a>${ctx && item && item.slot ? `<button class="btn ghost" data-swap="${esc(ctx)}">⇄ Swap</button>` : ''}</div>
-      <div class="section-h"><h2>Muscles worked</h2></div>
+      <div class="row" style="gap:8px"><a class="btn ghost grow" href="${ytLink(ex)}" target="_blank" rel="noopener">▶ Watch demo (YouTube)</a>${ctx && item && item.slot ? `<button class="btn ghost" data-swap="${esc(ctx)}">⇄ Swap</button>` : ''}</div></div>
+      <div class="sheet-r"><div class="section-h"><h2>Muscles worked</h2></div>
       ${WO.bodyMap(ex.primary, ex.secondary)}
       <div class="legend"><span><i style="background:var(--pri)"></i>Primary</span><span><i style="background:var(--sec);opacity:.6"></i>Secondary</span></div>
       <div class="chips">${muscleChips(ex)}</div>
@@ -388,8 +395,8 @@
       <ol class="cues">${ex.cues.map(c => `<li>${esc(c)}</li>`).join('')}</ol>
       <div class="note">${esc(tip)}</div>
       <div class="card flat small"><div><span class="tag">Equipment</span><div style="margin-top:3px">${esc(reqTxt)}</div></div>
-      <div style="margin-top:8px"><span class="tag">Available at</span><div style="margin-top:3px">${whereOk.length ? esc(whereOk.join(', ')) : '<span class="muted">None of your locations yet</span>'}</div></div></div>`;
-    openSheet(html);
+      <div style="margin-top:8px"><span class="tag">Available at</span><div style="margin-top:3px">${whereOk.length ? esc(whereOk.join(', ')) : '<span class="muted">None of your locations yet</span>'}</div></div></div></div></div>`;
+    openSheet(html, 'wide');
     if (coach) { const c = $('[data-coach-demo]'); if (c) WO.mountDemo(c, ex, { coach: true, speed: coachSpeed, view: coachView }); }
   }
   // ---------- coach mode helpers (mannequin) ----------
@@ -460,6 +467,7 @@
     const hash = location.hash.replace(/^#/, '') || 'today';
     const [r, arg] = hash.split('/');
     document.documentElement.classList.toggle('route-admin', r === 'admin');
+    if (r !== 'ex') document.documentElement.dataset.route = r === 'day' || !r ? 'today' : r; // desktop/tablet layout hooks (css: html[data-route=…])
     const view = $('#view');
     let tab = r;
     if (r === 'ex') {

@@ -547,3 +547,171 @@ html.in-session .restbar{bottom:calc(14px + var(--safe-b))}
 .today-loc{margin-top:12px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
 .today-loc .seg{flex:1 1 220px}.today-loc .seg button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .today-loc>.small{flex-basis:100%}
+
+/* ---------- v21 tablet + desktop layouts ----------
+   Phone (<768px) is untouched. Every rule is scoped to html:not([data-mu-vp]) so a phone whose viewport was rewritten /
+   zoomed by the inline Android/iPhone fix in index.html never picks up the wide layouts.
+   768–899px = tablet: compact icon rail on the left, full-width content, centered modal sheets.
+   ≥900px    = desktop: labeled sidebar, content fills the screen (cap 1400px), multi-column Today / Setup / Admin. */
+.admin-av,.admin-h{display:none!important}
+.day-sec,.ex-list,.sheet-l,.sheet-r,.sheet-cols{min-width:0}
+@media (min-width:768px){
+  html:not([data-mu-vp]){--rail:88px}
+  html:not([data-mu-vp]) body{padding-bottom:24px;padding-left:var(--rail)}
+  html:not([data-mu-vp]) .topbar{padding-left:28px;padding-right:28px}
+  html:not([data-mu-vp]) .topbar .brand-mark{display:none}
+  html:not([data-mu-vp]) .brand{font-size:15px}
+  /* tab bar → left rail */
+  html:not([data-mu-vp]) .tabbar{top:0;bottom:0;right:auto;width:var(--rail);display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:calc(14px + var(--safe-t)) 8px 14px;border-top:0;border-right:1px solid var(--tabbar-line);background:var(--bg2);backdrop-filter:none;-webkit-backdrop-filter:none}
+  html:not([data-mu-vp]) .tabbar::before{content:"";display:block;height:40px;margin:0 auto 14px;width:48px;background:linear-gradient(135deg,var(--brand-a),var(--brand-b));-webkit-mask:url(../brand/mountup-mark.svg) center/contain no-repeat;mask:url(../brand/mountup-mark.svg) center/contain no-repeat}
+  html:not([data-mu-vp]) .tabbar a{padding:10px 4px;border-radius:12px;gap:4px}
+  html:not([data-mu-vp]) .tabbar a:hover{background:var(--card);color:var(--text)}
+  html:not([data-mu-vp]) .tabbar a.on{background:var(--tint)}
+  html:not([data-mu-vp]) .tabbar a span{font-size:11.5px}
+  html:not([data-mu-vp]) .view{max-width:none;padding:22px 28px 40px}
+  html:not([data-mu-vp]) .restbar{left:calc(var(--rail) + 20px);right:20px;bottom:calc(20px + var(--safe-b))}
+  html:not([data-mu-vp]) .toast{left:calc(50% + var(--rail) / 2);bottom:calc(28px + var(--safe-b))}
+  /* sheets become centered dialogs */
+  html:not([data-mu-vp]) .sheet-panel{left:var(--rail);right:0;top:4vh;bottom:auto;max-height:92vh;width:auto;max-width:680px;margin:0 auto;border:1px solid var(--line);border-radius:22px;padding:8px 24px 26px;box-shadow:0 24px 70px var(--shadow)}
+  html:not([data-mu-vp]) .sheet-grab{display:none}
+  html:not([data-mu-vp]) .sheet-head{padding-top:12px}
+  /* admin keeps its own sidebar; hide the app rail there */
+  html:not([data-mu-vp]).route-admin body{padding-left:0}
+  html:not([data-mu-vp]).route-admin .tabbar{display:none}
+  html:not([data-mu-vp]).route-admin .topbar .brand-mark{display:block}
+  html:not([data-mu-vp]).route-admin .view{max-width:none;padding:0}
+  html:not([data-mu-vp]) .admin-shell{display:grid;grid-template-columns:200px minmax(0,1fr);min-height:calc(100vh - 56px)}
+  html:not([data-mu-vp]) .admin-side{margin:0;padding:20px 10px;border-right:1px solid var(--line);background:var(--bg2);position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto}
+  html:not([data-mu-vp]) .admin-brand{display:flex;gap:10px;align-items:center;padding:0 8px 18px}
+  html:not([data-mu-vp]) .admin-brand svg{width:36px;height:30px}
+  html:not([data-mu-vp]) .admin-nav{flex-direction:column;overflow:visible;gap:4px}
+  html:not([data-mu-vp]) .admin-nav a{background:transparent;border-color:transparent;font-size:14px;padding:10px 12px}
+  html:not([data-mu-vp]) .admin-nav a:hover{background:var(--card)}
+  html:not([data-mu-vp]) .admin-nav a.on{background:var(--tint);border-color:var(--accent)}
+  html:not([data-mu-vp]) .admin-main{padding:24px 26px 48px;max-width:none}
+  /* Setup: two balanced columns of cards */
+  html:not([data-mu-vp])[data-route=setup] .view{columns:2;column-gap:18px}
+  html:not([data-mu-vp])[data-route=setup] .view>*{break-inside:avoid}
+  html:not([data-mu-vp])[data-route=setup] .view>.card{display:inline-block;width:100%;margin:0 0 18px}
+  html:not([data-mu-vp])[data-route=setup] .view>a.card{display:flex}
+  html:not([data-mu-vp])[data-route=setup] .view>h1,html:not([data-mu-vp])[data-route=setup] #setupDone{column-span:all}
+  html:not([data-mu-vp])[data-route=setup] .view>h1{margin:2px 2px 16px!important;font-size:30px}
+  html:not([data-mu-vp])[data-route=setup] #setupDone{max-width:420px;margin:6px auto 24px!important;display:flex}
+  /* Week: day cards in a grid */
+  html:not([data-mu-vp])[data-route=week] .view{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;align-content:start}
+  html:not([data-mu-vp])[data-route=week] .view>*{margin:0}
+  html:not([data-mu-vp])[data-route=week] .view>:not(.weekday){grid-column:1/-1}
+  html:not([data-mu-vp])[data-route=week] .view>h1{margin:10px 2px 0!important}
+  /* exercise card: sets on the left, actions on the right of one row */
+  html:not([data-mu-vp]) .ex{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:14px;align-items:center}
+  html:not([data-mu-vp]) .ex>.ex-top,html:not([data-mu-vp]) .ex>.prog{grid-column:1/-1}
+  html:not([data-mu-vp]) .ex>.sets{grid-column:1;margin-top:14px}
+  html:not([data-mu-vp]) .ex>.ex-actions{grid-column:2;justify-content:flex-end;margin-top:14px}
+  /* Today: a bigger hero */
+  html:not([data-mu-vp]) .hero{padding:22px 24px;border-radius:20px}
+  html:not([data-mu-vp]) .hero h1{font-size:30px}
+  html:not([data-mu-vp]) .hero .stats{gap:28px;font-size:13.5px}
+  html:not([data-mu-vp]) .hero .stats b{font-size:20px}
+  html:not([data-mu-vp]) .daystrip{gap:8px}
+  html:not([data-mu-vp]) .daystrip a{padding:10px 0 9px;font-size:12px}
+  html:not([data-mu-vp]) .daystrip a b{font-size:17px}
+}
+@media (min-width:900px){
+  html:not([data-mu-vp]){--rail:224px}
+  html:not([data-mu-vp]) body{font-size:15.5px}
+  html:not([data-mu-vp]) .topbar{padding-left:36px;padding-right:36px;min-height:57px}
+  html:not([data-mu-vp]) #topTitle{font-size:16px;letter-spacing:.06em}
+  html:not([data-mu-vp]) .tabbar{padding:calc(20px + var(--safe-t)) 14px 20px;gap:4px}
+  html:not([data-mu-vp]) .tabbar::before{height:auto;width:auto;margin:0 6px 22px;padding:2px 0 0 52px;content:"MOUNT UP";font-weight:850;font-size:15px;letter-spacing:.06em;line-height:40px;color:var(--text);-webkit-mask:none;mask:none;background:url(../brand/mountup-mark.svg) left center/44px 36px no-repeat}
+  html:not([data-mu-vp]) .tabbar a{flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 14px;font-size:14.5px}
+  html:not([data-mu-vp]) .tabbar a span{font-size:14.5px}
+  html:not([data-mu-vp]) .tabbar svg{width:22px;height:22px;flex:0 0 22px}
+  html:not([data-mu-vp]) .view{max-width:1400px;margin:0 auto;padding:28px 40px 56px}
+  html:not([data-mu-vp]) h1{font-size:30px}
+  html:not([data-mu-vp]) h2{font-size:19px}
+  html:not([data-mu-vp]) .card{padding:18px 20px;border-radius:18px}
+  html:not([data-mu-vp]) .section-h{margin:24px 2px 8px}
+  html:not([data-mu-vp]) .btn{padding:11px 18px}
+  html:not([data-mu-vp]) .btn.sm{padding:8px 13px}
+  html:not([data-mu-vp]) .btn:hover{filter:brightness(1.08)}
+  html:not([data-mu-vp]) .chip:hover,html:not([data-mu-vp]) .list-row:hover{border-color:var(--line-strong)}
+  html:not([data-mu-vp]) .restbar{max-width:640px}
+  /* ----- Today / day view: hero + daystrip on top, workout on the left, warm-up / cool-down / notes in a sticky side column ----- */
+  html:not([data-mu-vp]) .day-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,350px);column-gap:28px;align-items:start;grid-auto-flow:row dense}
+  html:not([data-mu-vp]) .day-sec{grid-column:2}
+  html:not([data-mu-vp]) .day-main{grid-column:1;grid-row:1/span 6}
+  html:not([data-mu-vp]) .day-body .note{margin:0 0 10px}
+  html:not([data-mu-vp]) .day-notes{margin-top:14px}
+  html:not([data-mu-vp]) .day-warm>.section-h:first-child,html:not([data-mu-vp]) .day-main>.section-h:first-child{margin-top:14px}
+  html:not([data-mu-vp]) .ex-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:14px}
+  html:not([data-mu-vp]) .ex-list .ex{margin:0}
+  html:not([data-mu-vp]) .ex{padding:16px 18px;border-radius:18px}
+  html:not([data-mu-vp]) .ex-thumb{width:72px;height:72px;flex-basis:72px;border-radius:14px}
+  html:not([data-mu-vp]) .ex-name{font-size:17px}
+  html:not([data-mu-vp]) .ex-presc{font-size:13.5px}
+  html:not([data-mu-vp]) .sets{margin-top:12px}
+  html:not([data-mu-vp]) .ex-actions{margin-top:12px}
+  html:not([data-mu-vp]) .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,360px);column-gap:32px;align-items:end}
+  html:not([data-mu-vp]) .hero>*{grid-column:1}
+  html:not([data-mu-vp]) .hero>.row:first-child{grid-column:1/-1;grid-row:1}
+  html:not([data-mu-vp]) .hero>h1{grid-row:2}
+  html:not([data-mu-vp]) .hero>.stats{grid-row:3}
+  html:not([data-mu-vp]) .hero>.progress{grid-row:4;margin-top:16px;align-self:end;margin-bottom:6px}
+  html:not([data-mu-vp]) .hero>.today-loc{grid-column:2;grid-row:2/4;align-self:end;margin-top:8px}
+  html:not([data-mu-vp]) .hero>.row:not(:first-child){grid-column:2;grid-row:4;margin-top:12px!important}
+  /* ----- Exercise sheet: wide two-column dialog ----- */
+  html:not([data-mu-vp]) .sheet-panel{max-width:760px;padding:10px 30px 30px}
+  html:not([data-mu-vp]) .sheet-panel.wide{max-width:1180px;top:3vh;max-height:94vh}
+  html:not([data-mu-vp]) .sheet-panel.wide .sheet-cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:30px;align-items:start;margin-top:6px}
+  html:not([data-mu-vp]) .sheet-panel.wide .sheet-l{position:sticky;top:0}
+  html:not([data-mu-vp]) .sheet-panel.wide .sheet-r>.section-h:first-child{margin-top:12px}
+  html:not([data-mu-vp]) .sheet-panel.wide .demo{margin-top:6px}
+  html:not([data-mu-vp]) .sheet-panel.wide h1{font-size:28px!important}
+  html:not([data-mu-vp]) .sheet-panel.wide ol.cues li{margin:8px 0;line-height:1.5}
+  html:not([data-mu-vp]) .sheet-panel.wide .bodymaps{padding:14px 10px 6px}
+  /* ----- Setup ----- */
+  html:not([data-mu-vp])[data-route=setup] .view{column-gap:22px}
+  @media (min-width:1360px){html:not([data-mu-vp])[data-route=setup] .view{columns:3}}
+  /* ----- Library: two columns of rows ----- */
+  html:not([data-mu-vp])[data-route=library] #libList>.card{columns:2;column-gap:28px;padding:6px 18px}
+  html:not([data-mu-vp])[data-route=library] #libList .list-row{break-inside:avoid}
+  /* ----- Admin: full-width content, multi-column lists ----- */
+  html:not([data-mu-vp]) .admin-shell{grid-template-columns:248px minmax(0,1fr)}
+  html:not([data-mu-vp]) .admin-side{padding:24px 14px}
+  html:not([data-mu-vp]) .admin-brand svg{width:42px;height:35px}
+  html:not([data-mu-vp]) .admin-main{padding:32px 44px 56px}
+  html:not([data-mu-vp]) .admin-main h2{font-size:22px}
+  html:not([data-mu-vp]) .admin-stats{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:8px}
+  html:not([data-mu-vp]) .admin-stats .stat{padding:16px 18px}
+  html:not([data-mu-vp]) .admin-stats .stat b{font-size:30px}
+  html:not([data-mu-vp]) .admin-users{background:transparent;border:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-top:16px}
+  html:not([data-mu-vp]) .admin-urow{display:grid;grid-template-columns:44px minmax(0,1fr);grid-template-areas:"av main" "av goals" "av act";gap:4px 14px;align-items:start;padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:var(--card);transition:border-color .15s,transform .15s}
+  html:not([data-mu-vp]) .admin-urow:last-child{border-bottom:1px solid var(--line)}
+  html:not([data-mu-vp]) .admin-urow:hover{border-color:var(--accent);transform:translateY(-1px)}
+  html:not([data-mu-vp]) .admin-h{display:flex!important;margin-bottom:18px}
+  html:not([data-mu-vp]) .admin-flags-head>.row{flex-wrap:nowrap;flex:0 0 auto}
+  html:not([data-mu-vp]) .admin-av{display:flex!important;grid-area:av;width:44px;height:44px;border-radius:50%;align-items:center;justify-content:center;background:var(--tint);color:var(--accent-ink);font-weight:850;font-size:18px}
+  html:not([data-mu-vp]) .admin-urow>.grow{grid-area:main}
+  html:not([data-mu-vp]) .admin-urow>.grow b{word-break:break-all}
+  html:not([data-mu-vp]) .admin-ucoach{grid-area:goals;display:block;margin-top:6px;color:var(--text2)}
+  html:not([data-mu-vp]) .admin-uact{grid-area:act;text-align:left!important;margin-top:2px}
+  html:not([data-mu-vp]) .admin-uact br{display:none}
+  html:not([data-mu-vp]) .admin-uact::before{content:"● ";color:var(--good)}
+  html:not([data-mu-vp]) .admin-flags-head{gap:20px}
+  html:not([data-mu-vp]) .admin-flags-head .small{max-width:640px;margin-top:4px}
+  html:not([data-mu-vp]) .admin-flags{grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-top:16px}
+  html:not([data-mu-vp]) .admin-detail{gap:18px}
+  html:not([data-mu-vp]) .tf-filter{display:inline-flex;min-width:320px;margin:18px 14px 6px 0!important}
+  html:not([data-mu-vp]) #tfSync{display:inline-block;vertical-align:middle}
+  html:not([data-mu-vp]) .tf-list,html:not([data-mu-vp]) .tf-form{max-width:none}
+  html:not([data-mu-vp]) .tf-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;margin-top:12px;align-items:stretch}
+  html:not([data-mu-vp]) .tf-list>.card{margin:0}
+  html:not([data-mu-vp]) .tf-list>.tf-form{grid-column:1/-1}
+  html:not([data-mu-vp]) .tf-item{padding:18px 20px;gap:10px}
+  html:not([data-mu-vp]) .tf-item .tf-acts{margin-top:auto;padding-top:4px}
+  html:not([data-mu-vp]) .tf-title{font-size:16px}
+  html:not([data-mu-vp]) .tf-form{margin:16px 0}
+}
+@media (min-width:1600px){
+  html:not([data-mu-vp]) .ex-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

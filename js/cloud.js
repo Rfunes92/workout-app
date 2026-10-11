@@ -613,6 +613,13 @@ document.addEventListener('click', e => {
 });
 const fmtTs = t => (t && t.toDate ? t.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 const parseJ = d => { try { return JSON.parse(d.get('j')); } catch (e) { return null; } };
+// Users list markup (also used by tools/desktop_shots.mjs via WO.adminPreview to preview the layout with mock rows).
+function usersHtml(rows) {
+  const onb = rows.filter(r => r.onboarded).length;
+  return `<div class="admin-flags-head admin-h"><div><h2 style="margin:0">Users</h2><div class="small muted">Everyone with an account, most recently active first. Open one for activity and coach answers.</div></div></div><div class="admin-stats"><div class="stat"><b>${rows.length}</b><small>Users</small></div><div class="stat"><b>${onb}</b><small>Finished onboarding</small></div><div class="stat"><b>${rows.filter(r => r.lastActive && Date.now() - r.lastActive.toMillis() < 7 * 864e5).length}</b><small>Active 7 days</small></div></div>
+        <div class="card admin-users">` + rows.map(r => `<a href="#admin/${esc(r.id)}" class="entry admin-urow" style="color:inherit;text-decoration:none"><span class="admin-av" aria-hidden="true">${esc(((r.displayName || (r.coach && r.coach.name) || r.email || r.id || '?').trim()[0] || '?').toUpperCase())}</span><div class="grow"><b>${esc(r.email || r.id)}</b><div class="small muted">${esc(r.displayName || (r.coach && r.coach.name) || '')}${(r.displayName || (r.coach && r.coach.name)) ? ' · ' : ''}Joined ${fmtTs(r.createdAt)}</div></div><div class="small muted admin-ucoach">${r.onboarded ? esc(((r.coach && r.coach.goals) || []).map(g => (WO.GOALS[g] || {}).label || g).join(', ')) : '<span class="pill">Not onboarded</span>'}</div><div class="small muted admin-uact" style="text-align:right">Active<br> ${fmtTs(r.lastActive)}</div></a>`).join('') + '</div>';
+}
+WO.adminPreview = { usersHtml };
 WO.routes = WO.routes || {}; WO.afterRoute = WO.afterRoute || {};
 WO.routes.admin = arg => {
   if (WO.ui) WO.ui.setTop('Admin', curUser ? esc(curUser.email || '') : '');
@@ -632,9 +639,7 @@ WO.afterRoute.admin = async uid => {
     if (!uid) {
       const s = await FS.getDocsFromServer(FS.collection(db, 'users'));
       const rows = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => ((b.lastActive && b.lastActive.toMillis()) || 0) - ((a.lastActive && a.lastActive.toMillis()) || 0));
-      const onb = rows.filter(r => r.onboarded).length;
-      box.innerHTML = `<div class="admin-stats"><div class="stat"><b>${rows.length}</b><small>Users</small></div><div class="stat"><b>${onb}</b><small>Finished onboarding</small></div><div class="stat"><b>${rows.filter(r => r.lastActive && Date.now() - r.lastActive.toMillis() < 7 * 864e5).length}</b><small>Active 7 days</small></div></div>
-        <div class="card admin-users">` + rows.map(r => `<a href="#admin/${esc(r.id)}" class="entry admin-urow" style="color:inherit;text-decoration:none"><div class="grow"><b>${esc(r.email || r.id)}</b><div class="small muted">${esc(r.displayName || (r.coach && r.coach.name) || '')}${(r.displayName || (r.coach && r.coach.name)) ? ' · ' : ''}Joined ${fmtTs(r.createdAt)}</div></div><div class="small muted admin-ucoach">${r.onboarded ? esc(((r.coach && r.coach.goals) || []).map(g => (WO.GOALS[g] || {}).label || g).join(', ')) : '<span class="pill">Not onboarded</span>'}</div><div class="small muted" style="text-align:right">Active<br>${fmtTs(r.lastActive)}</div></a>`).join('') + '</div>';
+      box.innerHTML = usersHtml(rows);
       return;
     }
     const [p, data, days] = await Promise.all([FS.getDocFromServer(FS.doc(db, 'users', uid)), FS.getDocsFromServer(userCol(uid, 'data')), FS.getDocsFromServer(userCol(uid, 'foodDays'))]);
