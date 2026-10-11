@@ -662,9 +662,10 @@
       return `<line x1="${f1(A[0])}" y1="${f1(A[1])}" x2="${f1(B[0])}" y2="${f1(B[1])}" class="${kind === 'cable' ? 'cable' : 'band'}"/>` + (kind === 'cable' && typeof b !== 'string' ? `<circle cx="${f1(B[0])}" cy="${f1(B[1])}" r="3.4" class="mq-pulley"/>` : ''); }).join('');
   }
   function render(rig, t, opts) {
-    const ph = phase(rig, t), P = poseAny(rig, ph.q), q = P.q; q._c = ph.c;
+    const ph = phase(rig, t); if (opts.mod) Object.assign(ph.q, opts.mod(ph.q));
+    const P = poseAny(rig, ph.q), q = P.q; q._c = ph.c;
     const key = phase(rig, rig.key).idx, inten = Math.max(0.35, 1 - Math.min(1, Math.abs(ph.idx - key)) * 0.6);
-    const muscles = opts.muscles || [];
+    const prim = opts.muscles || [], muscles = prim.concat((opts.muscles2 || []).filter(m => prim.indexOf(m) < 0).map(m => m + '~'));
     let s = rig.floor === false ? '' : `<line x1="-300" y1="${FLOOR}" x2="500" y2="${FLOOR}" class="floor"/>`;
     if (rig.scene && SC[rig.scene]) s += SC[rig.scene].d(P, rig);
     if (rig.scene2 && SC[rig.scene2]) s += SC[rig.scene2].d(P, rig);
@@ -676,9 +677,9 @@
   }
   function bodySide(rig, P, q, muscles, inten) {
     const sh = figShapes(), mk = sh.mk, off = rig.farOff || [-3.5, -1.2], fz = p => add(p, off), sc = (shape, k) => shape.map(([u, v]) => [u, v * k]);
-    const mus = (seg, side, a, b) => muscles.filter(m => MUS[m] && MUS[m][0] === seg && ((rig.mside && rig.mside[m]) || 1) === side).map(m => {
+    const mus = (seg, side, a, b) => muscles.map(m0 => [m0.replace('~', ''), m0.endsWith('~')]).filter(([m]) => MUS[m] && MUS[m][0] === seg && ((rig.mside && rig.mside[m]) || 1) === side).map(([m, sec]) => {
       const shp = sc(MUS[m][1], mk[seg]), d = seg === 'torso' ? smooth(bend(q.B, shp).map(frame(a, dir(q.T), true))) : limb(a, b, shp, LEN[seg === 'calf' ? 'shank' : seg]);
-      return `<path class="mq-mus" style="opacity:${(0.4 + 0.5 * inten).toFixed(2)}" d="${d}"/>`; }).join('');
+      return `<path class="mq-mus${sec ? ' sec' : ''}" style="opacity:${((sec ? 0.25 : 0.4) + (sec ? 0.2 : 0.5) * inten).toFixed(2)}" d="${d}"/>`; }).join('');
     const foot = (a, fa, fs, cls) => { const d = dir(fa), so = [-d[1], d[0]]; return `<path class="${cls}" d="${smooth(sh.foot.map(([u, w]) => add(add(a, d, u * fs), so, w)))}"/>`; };
     const pr = rig.prop || 'none';
     const handProp = (E, W, far) => {
@@ -732,9 +733,10 @@
     const F = figFront(), back = rig.view === 'back', MM = back ? MUSB : MUSF, d = dir(q.T), lat = [-d[1], d[0]];
     const outward = (a, b, side) => { const u = unit(a, b), n = [u[1], -u[0]]; return (n[0] * lat[0] + n[1] * lat[1]) * (side === 'R' ? 1 : -1) < 0; };
     const op = `style="opacity:${(0.4 + 0.5 * inten).toFixed(2)}"`;
-    const limbMus = (seg, a, b, side) => muscles.filter(m => MM[m] && MM[m][0] === seg).map(m => `<path class="mq-mus" ${op} d="${limb(a, b, MM[m][1], LEN[seg === 'calf' ? 'shank' : seg], outward(a, b, side))}"/>`).join('');
+    const ML = muscles.map(m0 => [m0.replace('~', ''), m0.endsWith('~')]), op2 = `style="opacity:${(0.25 + 0.2 * inten).toFixed(2)}"`;
+    const limbMus = (seg, a, b, side) => ML.filter(([m]) => MM[m] && MM[m][0] === seg).map(([m, sec]) => `<path class="mq-mus${sec ? ' sec' : ''}" ${sec ? op2 : op} d="${limb(a, b, MM[m][1], LEN[seg === 'calf' ? 'shank' : seg], outward(a, b, side))}"/>`).join('');
     const tf = frame(P.P, d, true), kT = q.kT;
-    const torsoMus = muscles.filter(m => MM[m] && MM[m][0] === 'torso').map(m => { const h = MM[m][1]; return [1, -1].map(sg => `<path class="mq-mus" ${op} d="${smooth(h.map(([u, v]) => tf([u * kT, v * sg])))}"/>`).join(''); }).join('');
+    const torsoMus = ML.filter(([m]) => MM[m] && MM[m][0] === 'torso').map(([m, sec]) => { const h = MM[m][1]; return [1, -1].map(sg => `<path class="mq-mus${sec ? ' sec' : ''}" ${sec ? op2 : op} d="${smooth(h.map(([u, v]) => tf([u * kT, v * sg])))}"/>`).join(''); }).join('');
     const foot = (K, A) => { const u = unit(K, A), n = [u[1], -u[0]]; return `<path class="mq-body" d="${smooth([[-2, -5], [5, -6], [9, -3], [9, 3], [5, 6], [-2, 5]].map(([a, b]) => add(add(A, u, a), n, b)))}"/>`; };
     const leg = s => `<path class="mq-body" d="${limb(P['H' + s], P['K' + s], F.thigh, LEN.thigh, outward(P['H' + s], P['K' + s], s))}"/>` + limbMus('thigh', P['H' + s], P['K' + s], s) +
       `<path class="mq-body" d="${limb(P['K' + s], P['A' + s], F.calf, LEN.shank, outward(P['K' + s], P['A' + s], s))}"/>` + limbMus('calf', P['K' + s], P['A' + s], s) + foot(P['K' + s], P['A' + s]);
@@ -765,14 +767,24 @@
   // ---------- overlay: spine guide, joint angles, phased cues ----------
   function overlay(rig, P, q, ph, opts) {
     let s = '';
-    if (rig.spine !== false) { const ok = rig.spineOk ? rig.spineOk(q) : true, a = rig.view ? P.Hd : P.Hd, b = rig.view ? P.P : P.H; s += `<line x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(b[0])}" y2="${f1(b[1])}" class="mq-spine${ok ? ' ok' : ''}"/>`; }
+    if (rig.spine !== false) { const ok = !opts.bad && (rig.spineOk ? rig.spineOk(q) : true), a = rig.view ? P.Hd : P.Hd, b = rig.view ? P.P : P.H; s += `<line x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(b[0])}" y2="${f1(b[1])}" class="mq-spine${ok ? ' ok' : opts.bad ? ' bad' : ''}"/>`; }
     (rig.arcs || []).forEach(([a, c, b], i) => {
       const C0 = P[c], d1 = unit(C0, P[a]), d2 = unit(C0, P[b]), ag = Math.acos(Math.max(-1, Math.min(1, d1[0] * d2[0] + d1[1] * d2[1]))) / R, r = i ? 8 : 10;
       const s0 = add(C0, d1, r), s1 = add(C0, d2, r), sw = d1[0] * d2[1] - d1[1] * d2[0] > 0 ? 1 : 0, m = unit([0, 0], [d1[0] + d2[0] || 0.001, d1[1] + d2[1]]), tp = add(C0, m, r + 7);
       s += `<path class="mq-arc" d="M${f1(s0[0])},${f1(s0[1])} A${r},${r} 0 0 ${sw} ${f1(s1[0])},${f1(s1[1])}"/><text class="mq-deg" x="${f1(tp[0])}" y="${f1(tp[1] + 2)}" text-anchor="middle">${Math.round(ag)}°</text>`;
     });
     const vb = opts.vb || [-4, 10, 230, 172.5], K = Math.max(1, vb[2] / 230), right = vb[0] + vb[2] - 5 * K; let y = vb[1] + 5 * K;
+    if (opts.noCues) return s;
+    // Coach mode: 2-3 posture cues pinned to the body part they're about (leader line follows the joint)
+    const pins = opts.pins ? pinsFor(rig) : [];
+    pins.forEach((pn, i) => {
+      const J = pn.at(P); if (!J) return;
+      const w = (pn.text.length * 3.6 + 10) * K, h = 11 * K, x = vb[0] + 3 * K, py = vb[1] + vb[3] - (pins.length - i) * 14 * K - 4 * K;
+      s += `<g class="mq-pin"><line x1="${f1(x + w)}" y1="${f1(py + h / 2)}" x2="${f1(J[0])}" y2="${f1(J[1])}"/><circle cx="${f1(J[0])}" cy="${f1(J[1])}" r="${f1(2.2 * K)}"/><rect x="${f1(x)}" y="${f1(py)}" width="${f1(w)}" height="${f1(h)}" rx="${f1(5.5 * K)}"/><text x="${f1(x + w / 2)}" y="${f1(py + 7.8 * K)}" text-anchor="middle" style="font-size:${f1(6.4 * K)}px">${pn.text}</text></g>`;
+    });
+    const pinned = new Set(pins.map(p => p.text));
     rig.cues.forEach(cu => {
+      if (pinned.has(cu.text)) return;
       const c = ph.c, inside = (c >= cu.t[0] && c <= cu.t[1]) || (cu.t[1] > 1 && c <= cu.t[1] - 1) || (cu.t[0] < 0 && c >= cu.t[0] + 1);
       if (!inside) return;
       let prog = c >= cu.t[0] ? (c - cu.t[0]) / (cu.t[1] - cu.t[0]) : (c + 1 - cu.t[0]) / (cu.t[1] - cu.t[0]); if (cu.t[0] < 0 && c > 0.5) prog = (c - 1 - cu.t[0]) / (cu.t[1] - cu.t[0]);
@@ -781,6 +793,40 @@
       y += 15 * K;
     });
     return s;
+  }
+
+  // ---------- coach mode: pinned cues + common mistake ----------
+  const mid = (a, b) => (a && b ? [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] : null);
+  const PIN_SIDE = [[/back|spine|torso|chest|ribs|plank|straight line|body straight|square|tall|posture|lean/i, P => mid(P.H, P.S)], [/hip|glute|pelvis|seat/i, P => P.H], [/knee|legs? /i, P => P.K1],
+    [/quad|thigh|hamstring/i, P => mid(P.H, P.K1)], [/calf|heel|foot|feet|toe|mid-foot|shin|step/i, P => P.A1], [/elbow|upper arm|biceps|triceps|arms? /i, P => P.E1], [/shoulder|blade|lats|delt|shrug/i, P => P.S],
+    [/wrist|grip|bar|handle|weight|hand|dumbbell|band|rope|cable|palm|thumb|ball/i, P => P.W1], [/head|chin|neck|gaze|forehead|ears/i, P => P.Hd]];
+  const PIN_FRONT = [[/back|spine|torso|chest|ribs|lean|tall/i, P => mid(P.P, P.N0)], [/hip|glute|pelvis/i, P => P.HL], [/knee/i, P => P.KL], [/heel|foot|feet|toe/i, P => P.AL],
+    [/elbow|arms?\b/i, P => P.EL], [/shoulder|blade|shrug|delt/i, P => P.SL], [/wrist|grip|handle|hand|dumbbell|band|thumb|cable|palm/i, P => P.WL], [/head|chin|neck/i, P => P.Hd]];
+  function pinsFor(rig) {
+    if (rig._pins) return rig._pins;
+    const table = rig.view ? PIN_FRONT : PIN_SIDE, used = new Set(), out = [];
+    rig.cues.forEach(cu => { if (out.length >= 3) return; const hit = table.findIndex(([re], i) => !used.has(i) && re.test(cu.text)); if (hit < 0) return; used.add(hit); out.push({ text: cu.text, at: table[hit][1] }); });
+    return (rig._pins = out);
+  }
+  // A plausible "what it looks like done wrong" for each family, drawn by bending the key pose.
+  function mistakeFor(ex) {
+    const rig = rigFor(ex); if (!rig || !ex) return null;
+    const k = ex.kind, sl = ex.slots || [];
+    if (k === 'mobility' || k === 'cardio') return null;
+    if (rig.view) return { bad: 'Shrugging & leaning to cheat', fix: 'Shoulders down, torso still', mod: q => ({ T: q.T - 12, N: q.N - 20, tw: (q.tw || 0) + 0.3 }) };
+    const kq = phase(rig, rig.key).q;
+    if (sl.some(x => /^(quad|lunge)$/.test(x))) return { bad: 'Chest caves, back rounds', fix: 'Chest up, brace, flat back', mod: q => ({ T: q.T - 14, B: q.B + 16, N: q.N - 12 }) };
+    if (sl.some(x => /^(biceps|triceps|side_delt|rear_delt)$/.test(x))) return { bad: 'Swinging with the body', fix: 'Torso still, elbows pinned', mod: q => ({ T: q.T + 16, N: q.N + 16, B: q.B - 14 }) };
+    if (k === 'core') return { bad: 'Hips sag, low back arches', fix: 'Ribs down, squeeze glutes', mod: q => ({ B: q.B - 18 }) };
+    if (sl.some(x => /^(hpush|incline|vpush|fly)$/.test(x))) return { bad: 'Low back over-arched', fix: 'Ribs down, glutes on the pad', mod: q => ({ B: q.B - 18 }) };
+    if (kq.T < 160 || sl.some(x => /^(hinge|glute|hpull|ham_iso)$/.test(x))) return { bad: 'Rounded back', fix: 'Flat back, hips back, chest proud', mod: q => ({ B: q.B + 18, N: q.N - 14 }) };
+    return { bad: 'Rounded, rushed reps', fix: 'Tall spine, slow control', mod: q => ({ B: q.B + 16, N: q.N - 12 }) };
+  }
+  function staticSvg(ex, which) { // 'good' | 'bad' at the key frame, square, overlay = spine guide only
+    const rig = rigFor(ex); if (!rig) return '';
+    const m = mistakeFor(ex), vb = fitBox(rig, true);
+    const body = render(rig, rig.key, { overlay: true, noCues: true, still: true, vb, muscles: ex.primary || [], mod: which === 'bad' && m ? m.mod : null, bad: which === 'bad' });
+    return `<svg viewBox="${vb.join(' ')}" class="demo-svg mq mq-${FIG}" role="img" aria-label="${which === 'bad' ? 'Common mistake' : 'Correct form'}">${DEFS}<g>${body}</g></svg>`;
   }
 
   // fit the viewBox to the whole movement (+ scenery), 4:3 for the sheet, square for thumbnails
@@ -803,26 +849,40 @@
   const live = new Set(), mounted = new Set(); let raf = null;
   const draw = (d, c) => { d.c = c; d.g.innerHTML = render(d.rig, c, d.opts); };
   function loop(ts) {
-    live.forEach(d => { if (!d.g.isConnected) { live.delete(d); mounted.delete(d); return; } draw(d, (ts - d.t0) / d.rig.period); });
+    live.forEach(d => { if (!d.g.isConnected) { live.delete(d); mounted.delete(d); return; }
+      const dt = d.last == null ? 0 : ts - d.last; d.last = ts; if (d.paused) return; draw(d, (d.c || 0) + dt * (d.speed || 1) / d.rig.period); });
     raf = live.size ? requestAnimationFrame(loop) : null;
   }
   const DEFS = '<defs><linearGradient id="mqShade" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--mq-hi)"/><stop offset="1" style="stop-color:var(--mq-lo)"/></linearGradient></defs>';
   const rigFor = ex => { const k = ex && EX_RIG[ex.id]; return k && RIGS[k] ? normalize(RIGS[k]) : null; };
   const GENERIC = { stand: 'bwsquat' };
-  function mount(container, ex) {
+  function mount(container, ex, mo) {
     if (!container || !ex) return;
-    const rig = rigFor(ex) || normalize(RIGS[GENERIC.stand]), small = container.classList.contains('ex-thumb'), vb = fitBox(rig, small);
+    mo = mo || {};
+    let rig = rigFor(ex) || normalize(RIGS[GENERIC.stand]);
+    if (rig.view && mo.view && mo.view !== rig.view) rig = Object.assign({}, rig, { view: mo.view }); // front <-> back: same pose, other side of the body
+    const small = container.classList.contains('ex-thumb'), vb = fitBox(rig, small);
     if (!rigFor(ex) && window.console) console.warn('[mannequin] no rig for', ex.id, '- using generic pose');
     container.innerHTML = `<svg viewBox="${vb.join(' ')}" class="demo-svg mq mq-${FIG}" role="img" aria-label="Posture demo of ${String(ex.name).replace(/"/g, '')} (${FIG} figure)">${DEFS}<g></g></svg>`;
     const g = container.querySelector('g'), still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     const frozen = API.freeze != null, fz = API.freeze === 'key' ? rig.key : +API.freeze;
-    const d = { g, svg: container.firstElementChild, ex, container, rig, t0: performance.now() - rig.key * rig.period * (small ? 1 : 0), opts: { overlay: !small, still: still || frozen, vb, muscles: ex.primary || [] } };
+    const d = { g, svg: container.firstElementChild, ex, container, rig, speed: mo.speed || 1, last: null, opts: { overlay: !small, still: still || frozen, vb, muscles: ex.primary || [], muscles2: mo.coach ? (ex.secondary || []) : [], pins: !!mo.coach && !small } };
     mounted.forEach(o => { if (o.container === container) { mounted.delete(o); live.delete(o); } });
     mounted.add(d);
     // Reduce Motion (and thumbnails): show the KEY position of the movement, not whatever frame the loop was on
     draw(d, frozen ? fz : small || still ? rig.key : 0);
-    if (still || frozen || small) return;
+    if (still || frozen || small) { d.paused = true; return d; }
     live.add(d); if (!raf) raf = requestAnimationFrame(loop);
+    return d;
+  }
+  const findMounted = c => { let f = null; mounted.forEach(d => { if (d.container === c) f = d; }); return f; };
+  // Slow-mo / pause / step for the coach controls under the big demo
+  function control(container, cmd, val) {
+    const d = findMounted(container); if (!d) return null;
+    if (cmd === 'speed') { d.speed = +val || 1; if (d.paused && !d.opts.still) { d.paused = false; d.last = null; } live.add(d); if (!raf) raf = requestAnimationFrame(loop); }
+    else if (cmd === 'pause') { d.paused = !d.paused; d.last = null; if (!d.paused) { live.add(d); if (!raf) raf = requestAnimationFrame(loop); } }
+    else if (cmd === 'step') { d.paused = true; draw(d, (d.c || 0) + 0.125); }
+    return { speed: d.speed, paused: !!d.paused };
   }
   function setFigure(f) {
     if (f !== 'male' && f !== 'female') f = 'male';
@@ -832,7 +892,7 @@
     return FIG;
   }
   const API = { RIGS, EX_RIG, render, fitBox, DEFS, normalize, rigFor, setFigure, getFigure: () => FIG, freeze: null,
-    hasRig: ex => !!rigFor(ex), phase, pose: poseAny };
+    hasRig: ex => !!rigFor(ex), phase, pose: poseAny, mistakeFor, staticSvg, control, pinsFor };
   API.render = (rig, t, opts) => render(normalize(rig), t, opts);
   WO.mountDemo = mount; // every exercise renders a mannequin; the stick-figure path (demo.js) is no longer used
   WO.setFigure = setFigure; WO.getFigure = () => FIG;

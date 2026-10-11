@@ -119,3 +119,13 @@ First launch goes **sign in / create account (or use without account) → Welcom
 
 ## Desktop Admin
 At ≥900px wide, `#admin` uses a sidebar + wide content layout (user table, 3-column flag grid, 2-column user detail) and hides the tab bar. Phones (the Android viewport fix pins them to 390px) keep the stacked layout.
+
+## v18 — coaching, sessions, progression (`mountup-v18`)
+- **Plan first**: the quiz ends on a full plan reveal with a "why this" line per answer; "Quick start" skips the quiz. Saving an account is optional (one card, signed-out only).
+- **Coach mode** (`js/mannequin.js`): 2–3 cues pinned to joints, primary + secondary muscles, ½×/¼× slow-mo, pause/step, front/back view for front-view moves, and a "common mistake vs correct" panel. `node tools/check_demos.js` validates all rigs.
+- **Guided sessions** (`js/session.js`): preview with skip/undo, a player with a progress/timer bar, Back/Repeat/Skip/Next, and a voice toggle (beeps stay on). State survives reloads on the same day.
+- **Auto-progression** (`js/progress.js`): double progression per set history, with a plain-English reason and a one-tap −/use/+ override.
+- **Injury filter + gym swaps**: no-go zones hide flagged moves. Swaps only offer moves the gym's equipment allows, label in-plan vs new, and list what's not possible there. Gym brand presets approximate equipment (a places API isn't wired yet: `TODO(places API)` in `js/exercises.js`).
+- **No-clutter promise** (`js/flags.js` `POLICY`): no ads, at most one upsell per screen, nothing interrupts a session. New UX features are `ux` flags; Settings → Interface → Classic turns them all off.
+- **Goal types**: strength / muscle / lose fat / feel better. Goal weight is only required for lose fat, and the week chart changes to match.
+- **Sync & data**: a "✓ Saved" tick, flush on hide/pagehide, a history-merging cloud merge, and CSV export. CSV import accepts Hevy, Strong, or Mount Up exports; unknown exercises are kept as history.

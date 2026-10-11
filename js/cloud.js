@@ -118,6 +118,16 @@ function mergeWorkout(dev, cl) {
   o.done = Object.assign({}, dev.done);
   Object.entries(cl.done || {}).forEach(([d, v]) => { o.done[d] = Object.assign({}, o.done[d], v); });
   o.swaps = Object.assign({}, dev.swaps, cl.swaps);
+  // v18 lift history: union per exercise per day (a day logged on both devices keeps the one with more sets)
+  o.hist = {};
+  [dev.hist || {}, cl.hist || {}].forEach(src => Object.entries(src).forEach(([id, list]) => {
+    const by = {}; (o.hist[id] || []).forEach(e => { by[e.d] = e; });
+    (list || []).forEach(e => { const cur = by[e.d], n = x => ((x && x.r) || []).filter(v => v > 0).length; if (!cur || n(e) > n(cur)) by[e.d] = e; });
+    o.hist[id] = Object.values(by).sort((a, b) => (a.d < b.d ? -1 : 1)).slice(-40);
+  }));
+  o.days = Object.assign({}, dev.days, cl.days);
+  Object.keys(dev.days || {}).forEach(d => { o.days[d] = Math.max(+(dev.days[d]) || 0, +((cl.days || {})[d]) || 0); });
+  o.histNames = Object.assign({}, dev.histNames, cl.histNames);
   return o;
 }
 function mergeDocs(dev, cloud) {
@@ -214,7 +224,8 @@ function refreshUI(t) {
   if (WO.food && WO.food.reload) WO.food.reload();
   if (WO.ui && WO.ui.reloadState) WO.ui.reloadState();
   if (t.theme && WO.theme) WO.theme.apply();
-  const busy = !$('#sheet').classList.contains('hidden') || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+  // never yank the screen out from under someone mid-session (no-clutter promise) or mid-typing
+  const busy = !$('#sheet').classList.contains('hidden') || html.classList.contains('in-session') || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
   if (busy) pendingRerender = true; else if (WO.ui) WO.ui.rerender(true);
 }
 WO.sheetCloseHooks = (WO.sheetCloseHooks || []).concat(() => { if (pendingRerender) { pendingRerender = false; setTimeout(() => WO.ui && WO.ui.rerender(true), 0); } });
@@ -245,6 +256,11 @@ async function flush(ms) {
   return false;
 }
 window.addEventListener('online', () => { setStatus(); schedulePush(300); });
+// Bulletproofing: when the app is backgrounded / closed (phone locked between sets, tab swiped away), don't wait for the
+// 600 ms debounce: scan + push right away. Firestore queues the write offline and retries on its own.
+const flushSoon = () => { if (!curUid || leaving) return; clearTimeout(scanTimer); scan(); if (db && pendingKeys().length) push(); };
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSoon(); else if (curUid) { setStatus(); schedulePush(300); } });
+window.addEventListener('pagehide', flushSoon);
 window.addEventListener('offline', () => setStatus());
 setInterval(() => { if (curUid && !leaving) scan(); }, 60000); // safety net
 
@@ -493,12 +509,13 @@ function renderAccount() {
 }
 function nudge() {
   if (curUser || localUid || $('#nudge')) return;
+  if (WO.flags && WO.flags.canUpsell && !WO.flags.canUpsell('nudge')) return; // one upsell max, never during a session
   const h = location.hash || '#today';
   if (!/^#(today|food|day\/\w+)?$/.test(h)) return;
   if (Date.now() < +(LS.getItem(K.nudge) || 0)) return;
   const v = $('#view'); if (!v || !v.firstElementChild) return;
   const d = document.createElement('div');
-  d.className = 'card nudge'; d.id = 'nudge';
+  d.className = 'card nudge'; d.id = 'nudge'; d.dataset.upsell = 'nudge';
   d.innerHTML = `<div style="font-size:22px">☁️</div><div class="grow"><b>Back up your data</b><div class="small muted">Create a free account to keep your workouts &amp; food log safe and synced across devices.</div><button class="btn sm" style="margin-top:8px" data-auth-open="signup">Create account</button></div><button class="x" data-nudge-x aria-label="Dismiss">✕</button>`;
   v.insertBefore(d, v.firstElementChild);
 }
@@ -540,7 +557,7 @@ function onboardSummary() {
   const st = WO.ui && WO.ui.getState ? WO.ui.getState() : null;
   if (!st || !st.setupDone) return { onboarded: false };
   const p = st.profile || {};
-  return { onboarded: true, coach: { name: p.name || '', goals: st.goals || [], experience: p.experience || '', train: p.train || [], gyms: p.gyms || [], homeGym: !!p.homeGym, sessionLength: p.sessionLength || 60, limitations: p.limitations || [], goalWeight: p.goalWeight == null ? null : p.goalWeight, units: p.units || 'lb' } };
+  return { onboarded: true, coach: { name: p.name || '', goals: st.goals || [], experience: p.experience || '', train: p.train || [], gyms: p.gyms || [], homeGym: !!p.homeGym, sessionLength: p.sessionLength || 60, limitations: p.limitations || [], goalWeight: p.goalWeight == null ? null : p.goalWeight, goalType: p.goalType || null, units: p.units || 'lb' } };
 }
 async function touchProfile(user) {
   try {
@@ -567,9 +584,10 @@ function renderFlagsAdmin(box) {
   const modes = [['off', 'Off'], ['beta', 'Beta'], ['on', 'Live']];
   box.innerHTML = `<div class="admin-flags-head"><div><h2 style="margin:0">Feature flags</h2><div class="small muted">App-wide. <b>Off</b> = hidden for everyone. <b>Beta</b> = only people who flip Setup → Beta features. <b>Live</b> = everyone.</div></div>
     <button class="btn" id="flagsPublish">Publish to all users</button></div>
-    <div class="admin-flags">${Object.entries(F.CATALOG).map(([k, c]) => `<div class="card admin-flag"><div class="row between"><b>${esc(c.label)}</b><code class="small muted">${esc(k)}</code></div>
+    <div class="admin-flags">${Object.entries(F.CATALOG).map(([k, c]) => `<div class="card admin-flag"><div class="row between"><b>${esc(c.label)}${c.ux ? ' <span class="pill">UX rollout · Classic available</span>' : ''}</b><code class="small muted">${esc(k)}</code></div>
       <div class="small muted" style="margin:4px 0 10px">${esc(c.desc)}</div>
       <div class="seg">${modes.map(([m, l]) => `<button type="button" class="${adminDraft[k] === m ? 'on' : ''}" data-flag="${k}" data-mode="${m}">${l}</button>`).join('')}</div></div>`).join('')}</div>
+    ${F.POLICY ? `<div class="card admin-flag promise"><div class="row between"><b>🦅 No-clutter promise</b><span class="pill rest">Enforced in code</span></div><ul class="tips small">${F.PROMISE.map(t => `<li>${esc(t)}</li>`).join('')}</ul><div class="small muted">Ads: <b>never</b> (no ad code shipped) · Upsell surfaces per screen: <b>max ${F.POLICY.maxUpsellsPerScreen}</b> · Interrupt a running session: <b>${F.POLICY.interruptSession ? 'yes' : 'never'}</b>. Rollout flags marked <i>UX</i> can be switched back per device with Setup → Interface → Classic.</div></div>` : ''}
     <div id="flagsMsg" class="small muted" style="margin-top:10px">${F.loadedCloud() ? 'Showing the published values. Change, then Publish.' : 'No published flags yet: showing defaults.'}</div>`;
 }
 async function publishFlags() {

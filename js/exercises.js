@@ -30,6 +30,20 @@
     home: { label: 'Home basics', items: ['dumbbells', 'bench_adjustable', 'bands', 'pullup_bar', 'mat'] },
     home_full: { label: 'Home – full garage gym', items: ['dumbbells', 'barbell', 'bench_adjustable', 'bench_flat', 'rack', 'pullup_bar', 'bands', 'kettlebells', 'cable', 'mat', 'jump_rope', 'foam_roller', 'plyo_box'] }
   };
+  // Typical equipment by gym brand (what most locations have; it varies, so Setup → Equipment stays editable).
+  // TODO(places API): look up the actual nearby location instead of the brand average.
+  const FULL = PRESETS.gym.items;
+  const minus = (...x) => FULL.filter(id => !x.includes(id));
+  const GYM_BRANDS = {
+    'Planet Fitness': minus('barbell', 'rack', 'ez_bar', 'kettlebells', 'heavy_bag', 'trx', 'rower', 'plyo_box', 'jump_rope', 'medicine_ball', 'hack_squat', 'back_ext'),
+    'Blink Fitness': minus('heavy_bag', 'trx', 'hack_squat', 'medicine_ball'),
+    'Orangetheory': ['dumbbells', 'bench_flat', 'trx', 'medicine_ball', 'bands', 'rower', 'treadmill', 'bike', 'mat', 'plyo_box'],
+    'CrossFit box': ['barbell', 'rack', 'kettlebells', 'dumbbells', 'pullup_bar', 'plyo_box', 'rower', 'bike', 'jump_rope', 'medicine_ball', 'mat', 'bands', 'bench_flat', 'ab_wheel', 'dip_station', 'back_ext'],
+    'UFC Gym': FULL.concat('heavy_bag'),
+    'Apartment / building gym': ['dumbbells', 'bench_adjustable', 'bench_flat', 'cable', 'treadmill', 'bike', 'elliptical', 'mat', 'stability_ball'],
+    'Work gym': ['dumbbells', 'bench_adjustable', 'bench_flat', 'cable', 'lat_pulldown', 'treadmill', 'bike', 'elliptical', 'mat', 'stability_ball', 'bands']
+  };
+
 
   const MUSCLES = {
     chest: 'Chest', front_delts: 'Front delts', side_delts: 'Side delts', rear_delts: 'Rear delts',
@@ -326,5 +340,5 @@
   });
 
   window.WO = window.WO || {};
-  Object.assign(window.WO, { EQUIPMENT_GROUPS, EQUIPMENT, PRESETS, MUSCLES, EXERCISES: L, EX_BY_ID: Object.fromEntries(L.map(x => [x.id, x])) });
+  Object.assign(window.WO, { EQUIPMENT_GROUPS, EQUIPMENT, PRESETS, GYM_BRANDS, MUSCLES, EXERCISES: L, EX_BY_ID: Object.fromEntries(L.map(x => [x.id, x])) });
 })();

@@ -43,7 +43,7 @@
   };
   // When a limitation blocks a fixed-list item, swap in a safer move instead of leaving a gap (first one that fits wins).
   const LIMIT_FALLBACK = { dead_bug: ['bird_dog', 'pallof_press'], glute_bridge: ['bird_dog'], banded_glute_bridge: ['bird_dog'] };
-  let curBlocked = new Set();
+  let curBlocked = new Set(), curExp = 'some';
   function blockedFor(state) {
     const s = new Set();
     ((state.profile && state.profile.limitations) || []).forEach(k => (LIMIT_BLOCK[k] || []).forEach(id => s.add(id)));
@@ -69,7 +69,8 @@
     const tries = [slot].concat(FALLBACK[slot] || []);
     for (const s of tries) {
       const isoSlot = ISO_SLOTS.includes(s);
-      const score = e => (e.slots[0] === s ? 0 : 4) + (isoSlot && e.kind !== 'iso' ? 2 : 0) + (e.req.length === 0 ? 1 : 0);
+      // Brand-new lifters: machines / dumbbells before barbell technique lifts (the quiz's "why this" line says so)
+      const score = e => (e.slots[0] === s ? 0 : 4) + (isoSlot && e.kind !== 'iso' ? 2 : 0) + (e.req.length === 0 ? 1 : 0) + (curExp === 'new' && e.req.some(r => r === 'barbell') ? 1.6 : 0);
       const c = candidates(s, set).filter(e => !sessUsed.has(e.id)).map((e, i) => ({ e, sc: score(e) + i / 1000 })).sort((a, b) => a.sc - b.sc);
       if (!c.length) continue;
       const best = c[0].sc;
@@ -104,6 +105,8 @@
       sets = g('muscle') ? 4 : 3; reps = g('endurance') ? '15–20' : '12–15'; rest = g('fat_loss') ? 45 : 60;
       if (ex.id === 'band_lateral_walk') reps = '12–15/side';
     }
+    if (isMain && curExp === 'new') sets = Math.min(sets, 3);
+    if (isMain && curExp === 'veteran' && !g('endurance')) sets = Math.min(5, sets + 1);
     if (deload) sets = Math.max(2, sets - 1);
     return { sets, reps, rest };
   }
@@ -242,7 +245,7 @@
     const ah = gymDays.length >= 2 ? ['fullA', 'fullB', 'fullA', 'fullB', 'fullA', 'fullB', 'fullA'] : (AUTO_GYM[Math.min(7, homeDays.length)] || []);
     homeDays.forEach((d, i) => { focus[d] = ah[i]; });
     DAYS.forEach(d => { const f = state.schedule[d].focus; if (f && f !== 'auto') focus[d] = f; });
-    curBlocked = blockedFor(state);
+    curBlocked = blockedFor(state); curExp = (state.profile && state.profile.experience) || 'some';
     const weekUsed = new Set(); const week = {};
     let gi = 0, hi = 0;
     DAYS.forEach(d => {
@@ -276,5 +279,5 @@
     'Sleep 7+ hours; 5 am sessions mean an early night the evening before.'
   ];
 
-  Object.assign(WO, { LIMIT_BLOCK, DAYS, DAY_NAMES, GOALS, TEMPLATES, FOCUS_OPTIONS, equipSet, canDo, available, buildWeek, swapOptions, blockWeek, OVERLOAD, FAT_LOSS_TIPS, candidates });
+  Object.assign(WO, { LIMIT_BLOCK, LENGTH_MAX, blockedFor, DAYS, DAY_NAMES, GOALS, TEMPLATES, FOCUS_OPTIONS, equipSet, canDo, available, buildWeek, swapOptions, blockWeek, OVERLOAD, FAT_LOSS_TIPS, candidates });
 })();

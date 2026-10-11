@@ -21,7 +21,7 @@
       profile: {
         name: 'Athlete', units: 'lb', sessionLength: 60,
         experience: 'some', limitations: [], train: ['gym', 'home'], gyms: [], homeGym: false,
-        goalWeight: null, betaFeatures: false, tutorialDone: false, demoFigure: 'male'
+        goalWeight: null, goalType: null, betaFeatures: false, tutorialDone: false, demoFigure: 'male'
       },
       goals: ['fat_loss', 'sculpt'],
       locations: {
@@ -31,7 +31,7 @@
       },
       custom: { gym: [], home: [], muaythai: [] },
       schedule: defaultSchedule(),
-      swaps: {}, done: {}, log: {},
+      swaps: {}, done: {}, log: {}, hist: {}, days: {},
       startDate: iso(mondayOf(new Date()))
     };
   }
@@ -61,6 +61,15 @@
     return out;
   }
   let state = load();
+  // v18 plan first: a brand-new visitor goes straight to the quiz and sees the whole plan before any sign-up ask.
+  // (theme.js still adds needs-auth on first launch; Classic mode / flag off keeps the old sign-in-first screen.)
+  const H0 = document.documentElement;
+  if (WO.flags && WO.flags.isOn('plan_first') && H0.classList.contains('needs-auth') && !WO.authUid && !state.setupDone) {
+    try { localStorage.setItem('ronnieAuth.guest', '1'); } catch (e) { /* ignore */ }
+    H0.classList.remove('needs-auth'); WO.planFirst = true;
+  }
+  // Ask the browser not to evict our data under storage pressure (offline-first: localStorage is the working copy)
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* ignore */ }
   // demo figure (male/female) is per user: stored in the namespaced workout profile, which also syncs to the cloud
   const applyFigure = () => { if (WO.setFigure) WO.setFigure(state.profile.demoFigure === 'female' ? 'female' : 'male'); };
   applyFigure();
@@ -70,8 +79,25 @@
     // prune done-logs older than 21 days
     const cutoff = iso(new Date(Date.now() - 21 * 864e5));
     Object.keys(state.done).forEach(k => { if (k < cutoff) delete state.done[k]; });
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { console.warn('save failed', e); }
+    persistNow();
     week = null;
+  }
+  // Every write goes through here so the "Saved" tick is honest: it only shows after localStorage accepted the data.
+  let savedAt = 0, saveErr = false, flashT = 0;
+  function persistNow() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); savedAt = Date.now(); saveErr = false; }
+    catch (e) { console.warn('save failed', e); saveErr = true; }
+    showSaved();
+  }
+  function showSaved() {
+    let el = document.getElementById('savedTick');
+    const host = document.querySelector('.topright');
+    if (!el && host) { el = document.createElement('span'); el.id = 'savedTick'; el.className = 'saved-tick'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite'); host.insertBefore(el, host.firstChild); }
+    if (!el) return;
+    el.className = 'saved-tick show' + (saveErr ? ' err' : '');
+    el.textContent = saveErr ? '⚠ Not saved' : '✓ Saved';
+    el.title = saveErr ? 'This device refused the write (storage full or blocked). Export a backup from Setup.' : 'Saved on this device ' + new Date(savedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) + (WO.authUid ? ' · uploads to your account automatically' : '');
+    clearTimeout(flashT); if (!saveErr) flashT = setTimeout(() => { el.className = 'saved-tick'; }, 1600);
   }
   let week = null;
   const getWeek = () => (week = week || WO.buildWeek(state, new Date()));
@@ -94,8 +120,14 @@
     const k = iso(dateForDay(day));
     state.done[k] = state.done[k] || {};
     state.done[k][doneKey(day, key)] = arr;
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+    if (WO.progress) WO.progress.countDay(state, k, Object.values(state.done[k]).reduce((a, x) => a + (x || []).filter(Boolean).length, 0));
+    persistNow();
   }
+  function clearItem(day, key) { const k = iso(dateForDay(day)); if (state.done[k]) delete state.done[k][doneKey(day, key)];
+    const s = getWeek()[day], it = [...s.warmup, ...s.items, ...(s.finisher ? [s.finisher] : []), ...(s.cooldown || [])].find(i => i.key === key);
+    if (it && WO.progress && state.hist && state.hist[it.exId]) { const e = WO.progress.entryOn(state, it.exId, k, false); if (e) e.r = []; }
+    setDone(day, key, []); }
+  function clearDay(day) { const s = getWeek()[day]; [...s.warmup, ...s.items, ...(s.finisher ? [s.finisher] : []), ...(s.cooldown || [])].forEach(it => clearItem(day, it.key)); }
 
   // ---------- views ----------
   function setTop(title, meta) { $('#topTitle').textContent = title; $('#topMeta').innerHTML = meta || ''; }
@@ -114,9 +146,15 @@
     const all = done.every(Boolean);
     const last = state.log[ex.id];
     const showWt = ex.kind !== 'mobility' && ex.kind !== 'cardio' && !(opts && opts.noWeight);
+    const dk = iso(dateForDay(day)), P = WO.progress, prog = showWt && P && WO.flags && WO.flags.isOn('auto_progress');
+    const sg = prog ? P.suggest(state, ex, it, dateForDay(day)) : null, te = prog ? P.entryOn(state, ex.id, dk, false) : null;
+    const skipped = WO.session && WO.session.isSkipped(day, it.key);
     const rest = it.restAfter != null ? `rest ${fmtRest(it.restAfter)} after ${it.group.replace('1', '2')}` : it.rest ? `rest ${fmtRest(it.rest)}` : '';
     const presc = it.group && it.group.endsWith('1') ? `<b>${it.sets} × ${esc(it.reps)}</b> · then straight to ${it.group[0]}2` : `<b>${it.sets > 1 || ex.kind !== 'cardio' ? it.sets + ' × ' : ''}${esc(it.reps)}</b>${rest && !(it.group && it.group.endsWith('1')) ? ' · ' + rest : ''}`;
-    return `<div class="ex ${all ? 'done' : ''} ${it.group ? 'superset' : ''}" data-key="${it.key}">
+    const u = state.profile.units;
+    const wVal = te && te.w != null ? te.w : '', rVal = te && te.rr ? te.rr : '';
+    const progHtml = sg ? `<div class="prog ${sg.tone}"><div class="prog-why">💡 ${esc(sg.why)}</div>${sg.w != null || sg.reps ? `<div class="prog-act">${sg.w != null ? `<button type="button" class="btn sm ghost" data-prog="${ex.id}|w|${-sg.inc}" data-day="${day}" aria-label="${sg.inc} ${u} lighter">−${sg.inc}</button>` : ''}<button type="button" class="btn sm" data-prog="${ex.id}|use|${sg.w == null ? '' : sg.w}|${sg.reps || ''}" data-day="${day}">Use ${sg.w != null ? sg.w + ' ' + u + ' × ' : ''}${sg.reps || ''}${sg.w == null ? ' reps' : ''}</button>${sg.w != null ? `<button type="button" class="btn sm ghost" data-prog="${ex.id}|w|${sg.inc}" data-day="${day}" aria-label="${sg.inc} ${u} heavier">+${sg.inc}</button>` : ''}</div>` : ''}</div>` : '';
+    return `<div class="ex ${all ? 'done' : ''} ${it.group ? 'superset' : ''} ${skipped ? 'skipped' : ''}" data-key="${it.key}">
       <div class="ex-top">${demoThumb(ex)}
         <div class="grow"><div class="ex-name" data-open="${ex.id}" data-ctx="${day}|${it.key}">${it.group ? `<span class="grp">${it.group}</span>` : ''}${esc(ex.name)}</div>
         <div class="ex-presc">${presc}${it.note ? ` · <span class="muted">${esc(it.note)}</span>` : ''}</div>
@@ -124,10 +162,11 @@
       </div>
       <div class="sets">${done.map((v, i) => `<button class="set ${v ? 'on' : ''}" data-set="${i}" data-day="${day}" data-key="${it.key}" data-rest="${it.rest}" aria-label="Set ${i + 1}">${v ? '✓' : i + 1}</button>`).join('')}</div>
       <div class="ex-actions">
-        ${showWt ? `<label class="wt"><input type="number" inputmode="decimal" step="0.5" placeholder="${last ? esc(last.w) : '—'}" value="" data-wt="${ex.id}" aria-label="Weight"><span>${state.profile.units}${last ? ` · last ${esc(last.w)}` : ''}</span></label>` : ''}
+        ${showWt && prog ? `<label class="wt"><input type="number" inputmode="decimal" step="0.5" placeholder="${sg && sg.w != null ? sg.w : last ? esc(last.w) : '—'}" value="${esc(wVal)}" data-wt="${ex.id}" data-day="${day}" aria-label="Weight"><span>${u}</span></label><label class="wt"><input type="number" inputmode="numeric" step="1" placeholder="${sg && sg.reps ? sg.reps : 'reps'}" value="${esc(rVal)}" data-reps="${ex.id}" data-day="${day}" aria-label="Reps per set" style="width:40px"><span>reps</span></label>` : ''}
+        ${showWt && !prog ? `<label class="wt"><input type="number" inputmode="decimal" step="0.5" placeholder="${last ? esc(last.w) : '—'}" value="" data-wt="${ex.id}" aria-label="Weight"><span>${state.profile.units}${last ? ` · last ${esc(last.w)}` : ''}</span></label>` : ''}
         <button class="btn sm ghost" data-open="${ex.id}" data-ctx="${day}|${it.key}">Details</button>
         ${opts && opts.noSwap ? '' : `<button class="btn sm ghost" data-swap="${day}|${it.key}">⇄ Swap</button>`}
-      </div></div>`;
+      </div>${progHtml}</div>`;
   }
 
   function compactRow(day, it) {
@@ -154,7 +193,9 @@
     h += `<div class="hero ${t}"><div class="row between"><span class="tag">${esc(hello)}</span><span class="pill ${t}">${esc(locLabel(s.type))}${s.time ? ' · ' + fmtTime(s.time) : ''}</span></div>
       <h1 style="margin-top:6px">${esc(s.title)}</h1>
       <div class="stats"><div><b>${s.items.length + (s.finisher ? 1 : 0)}</b>exercises</div><div><b>~${s.minutes || 0}</b>min</div><div><b>${doneSets}/${totalSets}</b>sets</div></div>
-      <div class="progress"><div style="width:${pct}%"></div></div></div>`;
+      <div class="progress"><div style="width:${pct}%"></div></div>
+      ${WO.session && WO.flags.isOn('session_player') && allItems.length ? `<div class="row" style="gap:8px;margin-top:12px"><button type="button" class="btn ghost sm grow" data-sess-preview="${day}">👁 Preview</button><button type="button" class="btn sm grow" data-sess-start="${day}">▶ ${pct ? 'Continue' : 'Start'} session</button></div>` : ''}</div>`;
+    if (WO.session && WO.flags.isOn('session_player')) h = h.replace(dayStrip(day), dayStrip(day) + WO.session.bannerHtml(day));
     s.notes.forEach(n => { h += `<div class="note">${esc(n)}</div>`; });
     if (s.warmup.length) {
       h += `<div class="section-h"><h2>${s.type === 'muaythai' ? 'Pre-class mobility' : 'Warm-up'}</h2><span class="small muted">${s.type === 'muaythai' ? '~8 min' : '~6 min'}</span></div>`;
@@ -183,7 +224,8 @@
     const wk = getWeek(); const today = dayKeyOf(new Date());
     const bw = WO.blockWeek(state, new Date());
     setTop('This week', `Block wk ${bw}/4${bw === 4 ? ' · deload' : ''}`);
-    let h = `<h1 style="margin:6px 2px 4px">Weekly plan</h1><div class="small muted" style="margin:0 2px">Auto-generated from your schedule, goals and equipment. Change anything in Setup.</div>`;
+    let h = WO.progress && WO.flags.isOn('goal_charts') ? WO.progress.chartCard(state) : '';
+    h += `<h1 style="margin:6px 2px 4px">Weekly plan</h1><div class="small muted" style="margin:0 2px">Auto-generated from your schedule, goals and equipment. Change anything in Setup.</div>`;
     WO.DAYS.forEach(d => {
       const s = wk[d]; const t = s.type === 'off' ? 'rest' : s.type; const dt = dateForDay(d);
       const names = s.items.map(it => WO.EX_BY_ID[it.exId].name);
@@ -223,14 +265,18 @@
     const st = state;
     let h = `<h1 style="margin:6px 2px">Setup</h1><div id="accountCard" class="card acct"><h2>Account</h2><div class="small muted">Loading account…</div></div>`;
     // profile
-    const limLabels = { flat_back: 'No flat-back pressing', squat_back: 'Squat-sensitive', knees: 'Knees', shoulders: 'Shoulders' };
+    const limLabels = LIM_LABELS;
     const limTxt = (st.profile.limitations || []).map(k => limLabels[k] || k).join(' · ') || 'None';
+    const gt = WO.progress ? WO.progress.goalTypeOf(st) : 'feel_better', cutter = gt === 'lose_fat';
     h += `<div class="card"><h2>Profile</h2>
       <label class="f">Name</label><input type="text" id="pName" value="${esc(st.profile.name)}">
       <div class="row"><div class="grow"><label class="f">Session length</label><select id="pLen">${[30, 45, 60, 75, 90].map(m => `<option value="${m}" ${+st.profile.sessionLength === m ? 'selected' : ''}>${m} min</option>`).join('')}</select></div>
       <div style="width:110px"><label class="f">Units</label><select id="pUnits">${['lb', 'kg'].map(u => `<option ${st.profile.units === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div>
-      <div class="row"><div class="grow"><label class="f">Goal weight (${esc(st.profile.units)})</label><input type="number" id="pGoalWt" inputmode="decimal" step="0.5" value="${esc(st.profile.goalWeight == null ? '' : st.profile.goalWeight)}"></div>
+      ${WO.progress ? `<label class="f">Main goal</label><div class="goal-types">${Object.entries(WO.progress.GOAL_TYPES).map(([k, g]) => `<button type="button" class="chip ${gt === k ? 'on' : ''}" data-goaltype="${k}">${g.icon} ${esc(g.label)}</button>`).join('')}</div><div class="small muted" style="margin-top:4px">${esc(WO.progress.GOAL_TYPES[gt].desc)}</div>` : ''}
+      <div class="row"><div class="grow"><label class="f">Goal weight (${esc(st.profile.units)})${cutter ? '' : ' <span class="muted">— optional</span>'}</label><input type="number" id="pGoalWt" inputmode="decimal" step="0.5" placeholder="${cutter ? 'e.g. 180' : 'Optional — leave blank'}" value="${esc(st.profile.goalWeight == null ? '' : st.profile.goalWeight)}"></div>
       <a class="btn ghost sm" href="#food/progress" style="align-self:flex-end">📈 Weigh-ins</a></div>
+      <label class="f">Injuries / no-go zones</label><div class="small muted" style="margin-bottom:6px">Moves that aggravate these are left out of your plan and hidden from swaps.</div>
+      <div class="goal-types">${Object.entries(limLabels).map(([k, l]) => `<button type="button" class="chip ${(st.profile.limitations || []).includes(k) ? 'on' : ''}" data-lim="${k}">${esc(l)}</button>`).join('')}</div>
       <div class="small muted" style="margin-top:8px">Experience: <b style="color:var(--text)">${esc(st.profile.experience || '—')}</b> · Limits: <b style="color:var(--text)">${esc(limTxt)}</b>${(st.profile.gyms || []).length ? ` · Gyms: <b style="color:var(--text)">${esc(st.profile.gyms.join(', '))}</b>` : ''}${st.profile.homeGym ? ' · <b style="color:var(--text)">Home gym</b>' : ''}</div></div>`;
     // appearance
     const th = WO.theme ? WO.theme.get() : 'dark';
@@ -245,6 +291,10 @@
       <div class="small muted" style="margin:2px 0 10px">Off by default. Turns on unfinished experiments on <b>this device</b> (ones Admin marked as Beta). Live features stay on for everyone.</div>
       <label class="eq ${betaOn ? 'on' : ''}" id="betaToggle" style="cursor:pointer"><span class="box"></span><div><b>Enable beta features</b><div class="small muted">Food previews, desktop shell experiments, and other gated work.</div></div></label>
       ${WO.flags ? `<div class="small muted" style="margin-top:10px">Flag status: ${Object.keys(WO.flags.CATALOG).map(k => `${WO.flags.CATALOG[k].label.split('(')[0].trim()} <b style="color:var(--text)">${WO.flags.modeOf(k)}</b>${WO.flags.isOn(k) ? ' ✓' : ''}`).join(' · ')}</div>` : ''}</div>`;
+    const classic = WO.flags && WO.flags.isClassic();
+    h += `<div class="card"><div class="row between"><h2>Interface</h2><span class="pill">${classic ? 'Classic' : 'New'}</span></div><div class="small muted" style="margin:2px 0 8px">New features roll out gradually. Prefer the old screens? Switch to Classic on this device anytime — your data is the same either way.</div>
+      <div class="seg" role="radiogroup" aria-label="Interface">${[['new', '✨ New coach UX'], ['classic', '🗂 Classic']].map(([k, l]) => `<button type="button" role="radio" aria-checked="${(k === 'classic') === !!classic}" class="${(k === 'classic') === !!classic ? 'on' : ''}" data-ux="${k}">${l}</button>`).join('')}</div></div>`;
+    if (WO.flags && WO.flags.PROMISE) h += `<div class="card promise"><h2>🦅 The no-clutter promise</h2><ul class="tips">${WO.flags.PROMISE.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>`;
     h += `<div class="card"><h2>App looks tiny / zoomed out?</h2><div class="small muted" style="margin-bottom:8px">On Android Chrome, clear the offline cache so the latest layout fix loads. Your workouts and food log stay on this device.</div>
       <button class="btn block" id="resetLayout">Reset layout / clear offline cache</button></div>`;
     // goals
@@ -273,7 +323,9 @@
       </div></div>`;
     // data
     h += `<div class="card"><h2>Training block & data</h2><div class="small muted" style="margin-bottom:6px">Backup export/import includes workouts, food log, foods, recipes, weights, water and appearance.</div><div class="small muted">Current block week: ${WO.blockWeek(st, new Date())} of 4 (week 4 = deload). Started ${esc(st.startDate)}.</div>
-      <div class="row wrap" style="margin-top:10px"><button class="btn sm ghost" id="blockReset">Restart block this week</button><button class="btn sm ghost" id="swapReset">Clear all swaps</button><button class="btn sm ghost" id="exportBtn">Export backup</button><label class="btn sm ghost">Import<input type="file" id="importFile" accept="application/json" hidden></label><button class="btn sm danger" id="wipe">Reset everything</button></div></div>`;
+      <div class="row wrap" style="margin-top:10px"><button class="btn sm ghost" id="blockReset">Restart block this week</button><button class="btn sm ghost" id="swapReset">Clear all swaps</button><button class="btn sm ghost" id="exportBtn">Export backup</button><label class="btn sm ghost">Import<input type="file" id="importFile" accept="application/json" hidden></label><button class="btn sm danger" id="wipe">Reset everything</button></div>
+      ${WO.progress ? `<div class="small muted" style="margin:12px 0 6px"><b style="color:var(--text)">Workout history CSV</b> · ${Object.values(st.hist || {}).reduce((a, l) => a + l.filter(e => (e.r || []).some(n => n > 0)).length, 0)} logged exercise-days. Import works with Hevy and Strong exports, or a Mount Up CSV.</div>
+      <div class="row wrap"><button class="btn sm ghost" id="csvExport">⬇ Export CSV</button><label class="btn sm ghost">⬆ Import CSV (Hevy / Strong / Mount Up)<input type="file" id="csvImport" accept=".csv,text/csv,text/plain" hidden></label></div><div id="csvMsg" class="small muted" style="margin-top:6px"></div>` : ''}</div>`;
     h += `<a class="card row between" href="#food/goals" style="color:inherit"><div><h2>Nutrition goals</h2><div class="small muted">Calories, protein, carbs/fat split, fiber, water, USDA API key</div></div><span class="muted">›</span></a>`;
     h += `<button class="btn block" id="setupDone" style="margin:8px 0 20px">Save & see today's workout</button>`;
     return h;
@@ -285,7 +337,7 @@
   }
 
   // ---------- exercise sheet ----------
-  let sheetCtx = null;
+  let sheetCtx = null, lastCoachEx = null;
   function openSheet(html) {
     $('#sheetBody').innerHTML = html; $('#sheet').classList.remove('hidden'); document.body.style.overflow = 'hidden';
     $('.sheet-panel').scrollTop = 0; mountDemos($('#sheetBody'));
@@ -298,6 +350,7 @@
   }
   function showExercise(id, ctx) {
     const ex = WO.EX_BY_ID[id]; if (!ex) return;
+    if (lastCoachEx !== id) { coachView = null; lastCoachEx = id; }
     sheetCtx = ctx || null;
     let item = null;
     if (ctx) { item = findItem(ctx.split('|')[0], ctx.split('|')[1]).it; }
@@ -306,9 +359,12 @@
     const tip = ex.kind === 'mobility' ? 'Move slowly and breathe; aim for a little more range each time.' : ex.kind === 'cardio' ? 'Progress by adding a round, a little speed/incline/resistance, or shortening the easy interval.' :
       ex.req.length === 0 || ex.req.every(r => r === 'bands') ? 'Progress: add reps, slow the lowering to 3s, add a pause, or use a harder variation/band.' :
       `Progress: when you hit the top of the rep range on all sets, add ${/quads|glutes|hamstrings/.test(ex.primary.join()) ? '5–10' : '2.5–5'} ${state.profile.units === 'kg' ? 'lb (~1–2.5 kg)' : 'lb'} next session.`;
+    const coach = WO.flags && WO.flags.isOn('coach_mode') && WO.MANNEQUIN;
     const html = `<div class="sheet-head"><div><div class="tag">${esc(ex.kind)}${item ? ' · ' + item.sets + ' × ' + esc(item.reps) : ''}</div><h1 style="font-size:23px;margin-top:4px">${esc(ex.name)}</h1></div><button class="close-x" data-close aria-label="Close">✕</button></div>
-      <div class="demo" data-demo="${ex.id}"></div>
+      <div class="demo" ${coach ? `data-coach-demo="${ex.id}"` : `data-demo="${ex.id}"`}></div>
+      ${coach ? coachControls(ex) : ''}
       ${figSeg()}
+      ${coach ? mistakePanel(ex) : ''}
       <div class="row" style="gap:8px"><a class="btn ghost grow" href="${ytLink(ex)}" target="_blank" rel="noopener">▶ Watch demo (YouTube)</a>${ctx && item && item.slot ? `<button class="btn ghost" data-swap="${esc(ctx)}">⇄ Swap</button>` : ''}</div>
       <div class="section-h"><h2>Muscles worked</h2></div>
       ${WO.bodyMap(ex.primary, ex.secondary)}
@@ -320,15 +376,41 @@
       <div class="card flat small"><div><span class="tag">Equipment</span><div style="margin-top:3px">${esc(reqTxt)}</div></div>
       <div style="margin-top:8px"><span class="tag">Available at</span><div style="margin-top:3px">${whereOk.length ? esc(whereOk.join(', ')) : '<span class="muted">None of your locations yet</span>'}</div></div></div>`;
     openSheet(html);
+    if (coach) { const c = $('[data-coach-demo]'); if (c) WO.mountDemo(c, ex, { coach: true, speed: coachSpeed, view: coachView }); }
   }
+  // ---------- coach mode helpers (mannequin) ----------
+  let coachSpeed = 1, coachView = null;
+  function coachControls(ex) {
+    const rig = WO.MANNEQUIN.rigFor(ex), front = rig && rig.view;
+    return `<div class="coach-ctl"><div class="seg" role="radiogroup" aria-label="Demo speed">${[[1, '1×'], [0.5, '½× slow'], [0.25, '¼× slow-mo']].map(([v, l]) => `<button type="button" class="${coachSpeed === v ? 'on' : ''}" data-coach-speed="${v}">${l}</button>`).join('')}</div>
+      <button type="button" class="btn sm ghost" data-coach="pause" aria-label="Pause / play">⏯</button><button type="button" class="btn sm ghost" data-coach="step" aria-label="Step frame">⏭</button>
+      ${front ? `<button type="button" class="btn sm ghost" data-coach-view="${(coachView || rig.view) === 'front' ? 'back' : 'front'}">↻ ${(coachView || rig.view) === 'front' ? 'Back' : 'Front'} view</button>` : ''}</div>
+      <div class="small muted coach-legend"><span><i class="lg-pin"></i>pinned cue</span><span><i style="background:var(--accent)"></i>target</span>${ex.secondary.length ? '<span><i style="background:var(--accent);opacity:.4"></i>helpers</span>' : ''}<span><i class="lg-spine"></i>green spine = on track</span></div>`;
+  }
+  function mistakePanel(ex) {
+    const m = WO.MANNEQUIN.mistakeFor(ex); if (!m) return '';
+    return `<div class="section-h"><h2>Common mistake vs correct</h2></div><div class="mistake"><figure class="bad">${WO.MANNEQUIN.staticSvg(ex, 'bad')}<figcaption>✗ ${esc(m.bad)}</figcaption></figure><figure class="good">${WO.MANNEQUIN.staticSvg(ex, 'good')}<figcaption>✓ ${esc(m.fix)}</figcaption></figure></div>`;
+  }
+  let showFlagged = false;
+  const LIM_LABELS = { flat_back: 'No flat-back pressing', squat_back: 'Squat-sensitive back', knees: 'Knees', shoulders: 'Shoulders' };
   function showSwap(ctx) {
     const [day, key] = ctx.split('|');
     const { s, it } = findItem(day, key); if (!it) return;
     const cur = WO.EX_BY_ID[it.exId];
-    const opts = key === 'fin' ? WO.EXERCISES.filter(e => e.slots.includes('cardio') && e.id !== cur.id && WO.canDo(e, WO.equipSet(state, s.loc))) : WO.swapOptions(state, s, it);
+    const set = WO.equipSet(state, s.loc);
+    const all = key === 'fin' ? WO.EXERCISES.filter(e => e.slots.includes('cardio') && e.id !== cur.id && WO.canDo(e, set)) : WO.swapOptions(state, s, it);
+    // Injury filter: hide moves the user flagged (plan already avoids them); count them so it's never a silent cut
+    const blocked = WO.blockedFor ? WO.blockedFor(state) : new Set();
+    const lims = (state.profile.limitations || []).map(k => LIM_LABELS[k] || k);
+    const opts = showFlagged ? all : all.filter(e => !blocked.has(e.id)), flagged = all.filter(e => blocked.has(e.id));
+    const inPlan = new Set(Object.values(getWeek()).flatMap(x => [...x.items, ...(x.finisher ? [x.finisher] : [])].map(i => i.exId)));
+    const noGear = key === 'fin' ? [] : WO.EXERCISES.filter(e => e.id !== cur.id && e.slots.includes(it.slot) && !WO.canDo(e, set));
+    const gearTxt = e => e.req.filter(r => !r.split('|').some(o => set.has(o))).map(r => r.split('|').map(x => WO.EQUIPMENT[x].label).join(' / ')).join(' + ');
     const html = `<div class="sheet-head"><div><div class="tag">Swap exercise · ${esc(s.locName)}</div><h1 style="font-size:21px;margin-top:4px">Replace ${esc(cur.name)}</h1></div><button class="close-x" data-close aria-label="Close">✕</button></div>
-      <div class="small muted" style="margin:6px 0">Only exercises your ${esc(s.locName)} equipment supports. Same movement pattern first.</div>
-      <div class="card" style="padding:4px 12px">${opts.map(e => `<div class="list-row" data-doswap="${e.id}"><div class="ex-thumb" data-demo="${e.id}" style="width:48px;height:48px;flex-basis:48px"></div><div class="grow"><b>${esc(e.name)}</b><div class="small muted">${e.primary.map(m => WO.MUSCLES[m]).join(', ')}</div></div><span class="pill">${e.slots.includes(it.slot) ? 'same pattern' : 'similar'}</span></div>`).join('') || '<div class="empty">No alternatives with this equipment.</div>'}</div>
+      <div class="small muted" style="margin:6px 0">Real alternatives from the full library that your <b>${esc(s.locName)}</b> equipment supports${lims.length ? ` and that respect <b>${esc(lims.join(', '))}</b>` : ''}. Same movement pattern first.</div>
+      <div class="card" style="padding:4px 12px">${opts.map(e => `<div class="list-row" data-doswap="${e.id}"><div class="ex-thumb" data-demo="${e.id}" style="width:48px;height:48px;flex-basis:48px"></div><div class="grow"><b>${esc(e.name)}</b><div class="small muted">${e.primary.map(m => WO.MUSCLES[m]).join(', ')}${inPlan.has(e.id) ? ' · in your plan' : ' · new to your plan'}</div></div><span class="pill ${blocked.has(e.id) ? 'warn' : ''}">${blocked.has(e.id) ? '⚠ flagged' : e.slots.includes(it.slot) ? 'same pattern' : 'same muscles'}</span></div>`).join('') || '<div class="empty">No alternatives with this equipment.</div>'}</div>
+      ${flagged.length ? `<button class="btn ghost sm block" data-swap-flagged="${esc(ctx)}">${showFlagged ? 'Hide' : 'Show'} ${flagged.length} move${flagged.length > 1 ? 's' : ''} flagged for ${esc(lims.join(', '))}</button>` : ''}
+      ${noGear.length ? `<div class="small muted" style="margin:10px 2px 4px">Not possible at ${esc(s.locName)} (missing equipment):</div><div class="small muted">${noGear.slice(0, 6).map(e => `${esc(e.name)} <span class="muted">— needs ${esc(gearTxt(e))}</span>`).join('<br>')}${noGear.length > 6 ? `<br>+${noGear.length - 6} more` : ''}<br><a href="#setup" data-close>Edit ${esc(s.locName)} equipment</a></div>` : ''}
       ${state.swaps[`${day}:${key}`] ? `<button class="btn ghost block" data-doswap="__reset">Reset to the plan's pick</button>` : ''}`;
     sheetCtx = ctx;
     openSheet(html);
@@ -391,11 +473,29 @@
     if (setBtn) {
       const { day, key } = setBtn.dataset; const i = +setBtn.dataset.set;
       const { it } = findItem(day, key); if (!it) return;
-      const arr = getDone(day, key, it.sets); arr[i] = !arr[i]; setDone(day, key, arr);
+      const arr = getDone(day, key, it.sets); arr[i] = !arr[i];
+      if (WO.progress) WO.progress.recordSet(state, WO.EX_BY_ID[it.exId], it, i, arr[i], dateForDay(day));
+      setDone(day, key, arr);
       if (arr[i]) startRest(+setBtn.dataset.rest || 0);
-      rerender(true); return;
+      rerender(true);
+      if (WO.session) WO.session.onSet(day, key, arr.every(Boolean));
+      return;
     }
-    const sw = t.closest('[data-swap]'); if (sw) { showSwap(sw.dataset.swap); return; }
+    const pg = t.closest('[data-prog]');
+    if (pg && WO.progress) {
+      const [id, kind, a, b] = pg.dataset.prog.split('|'), ex = WO.EX_BY_ID[id], dk = dateForDay(pg.dataset.day || dayKeyOf(new Date()));
+      if (kind === 'use') { if (a !== '') WO.progress.setToday(state, ex, 'w', +a, dk); if (b) WO.progress.setToday(state, ex, 'rr', +b, dk); }
+      else { const e = WO.progress.entryOn(state, id, iso(dk), false), inp = $(`[data-wt="${id}"][data-day="${pg.dataset.day}"]`); const base = (e && e.w != null) ? +e.w : inp ? +(inp.value || inp.placeholder) || 0 : 0; WO.progress.setToday(state, ex, 'w', Math.max(0, base + +a), dk); }
+      save(); rerender(true); if (WO.session && WO.session.active()) WO.session.onSet(WO.session.state().day, '', false); return;
+    }
+    const csp = t.closest('[data-coach-speed]');
+    if (csp) { coachSpeed = +csp.dataset.coachSpeed; const c = $('[data-coach-demo]'); if (c) WO.MANNEQUIN.control(c, 'speed', coachSpeed); csp.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === csp)); return; }
+    const cc = t.closest('[data-coach]');
+    if (cc) { const c = $('[data-coach-demo]'); if (c) WO.MANNEQUIN.control(c, cc.dataset.coach); return; }
+    const cv = t.closest('[data-coach-view]');
+    if (cv) { coachView = cv.dataset.coachView; const c = $('[data-coach-demo]'), ex = c && WO.EX_BY_ID[c.dataset.coachDemo]; if (ex) { WO.mountDemo(c, ex, { coach: true, speed: coachSpeed, view: coachView }); const ctl = cv.closest('.coach-ctl'); const tmp = document.createElement('div'); tmp.innerHTML = coachControls(ex); ctl.replaceWith(tmp.firstElementChild); } return; }
+    const sf = t.closest('[data-swap-flagged]'); if (sf) { showFlagged = !showFlagged; showSwap(sf.dataset.swapFlagged); return; }
+    const sw = t.closest('[data-swap]'); if (sw) { showFlagged = false; showSwap(sw.dataset.swap); return; }
     const ds = t.closest('[data-doswap]');
     if (ds && sheetCtx) {
       const [day, key] = sheetCtx.split('|');
@@ -415,6 +515,12 @@
     if (fs) { state.profile.demoFigure = fs.dataset.figSet === 'female' ? 'female' : 'male'; save(); applyFigure(); return; }
     const ts = t.closest('[data-theme-set]');
     if (ts && WO.theme) { WO.theme.set(ts.dataset.themeSet); ts.parentElement.querySelectorAll('button').forEach(b => { const on = b === ts; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); return; }
+    const gtb = t.closest('[data-goaltype]');
+    if (gtb && WO.progress) { const k = gtb.dataset.goaltype; state.profile.goalType = k; const G = WO.progress.GOAL_TYPES[k]; state.goals = Array.from(new Set(G.goals.concat(state.goals.filter(x => !['strength', 'muscle', 'sculpt', 'fat_loss', 'general'].includes(x))))); save(); rerender(true); return; }
+    const lm = t.closest('[data-lim]');
+    if (lm) { const k = lm.dataset.lim, L = state.profile.limitations || []; state.profile.limitations = L.includes(k) ? L.filter(x => x !== k) : L.concat(k); save(); rerender(true); return; }
+    const ux = t.closest('[data-ux]'); if (ux && WO.flags) { WO.flags.setClassic(ux.dataset.ux === 'classic'); rerender(true); return; }
+    if (t.id === 'csvExport' && WO.progress) { const b = new Blob([WO.progress.exportCSV(state)], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'mountup-workouts-' + iso(new Date()) + '.csv'; a.click(); return; }
     const g = t.closest('[data-goal]');
     if (g) { const k = g.dataset.goal; state.goals = state.goals.includes(k) ? state.goals.filter(x => x !== k) : state.goals.concat(k); save(); g.classList.toggle('on'); return; }
     const eq = t.closest('[data-eq]');
@@ -471,9 +577,23 @@
     if (t.id === 'pName') { state.profile.name = t.value.trim(); save(); return; }
     if (t.id === 'pLen') { state.profile.sessionLength = +t.value; save(); rerender(true); return; }
     if (t.id === 'pUnits') { state.profile.units = t.value; save(); rerender(true); return; }
-    if (t.id === 'pGoalWt') { const v = parseFloat(t.value); state.profile.goalWeight = v > 0 ? Math.round(v * 10) / 10 : null; save(); return; }
+    if (t.id === 'pGoalWt') { const v = parseFloat(t.value); /* optional unless the main goal is losing fat */ state.profile.goalWeight = v > 0 ? Math.round(v * 10) / 10 : null; save(); return; }
     if (t.id === 'locName') { state.locations[setupLoc].name = t.value.trim() || state.locations[setupLoc].name; save(); rerender(true); return; }
-    if (t.dataset.wt) { const v = t.value.trim(); if (v) { state.log[t.dataset.wt] = { w: v, d: iso(new Date()) }; save(); t.placeholder = v; } return; }
+    if (t.dataset.wt) {
+      const v = t.value.trim();
+      if (WO.progress && WO.flags.isOn('auto_progress')) { WO.progress.setToday(state, WO.EX_BY_ID[t.dataset.wt], 'w', parseFloat(v) || 0, dateForDay(t.dataset.day || dayKeyOf(new Date()))); save(); return; }
+      if (v) { state.log[t.dataset.wt] = { w: v, d: iso(new Date()) }; save(); t.placeholder = v; } return;
+    }
+    if (t.dataset.reps && WO.progress) { WO.progress.setToday(state, WO.EX_BY_ID[t.dataset.reps], 'rr', parseInt(t.value, 10) || 0, dateForDay(t.dataset.day || dayKeyOf(new Date()))); save(); return; }
+    if (t.id === 'csvImport' && t.files[0] && WO.progress) {
+      const msg = $('#csvMsg');
+      t.files[0].text().then(txt => {
+        const r = WO.progress.importCSV(state, txt); save();
+        const note = `Imported ${r.sets} sets from ${r.format}: ${r.entries} exercise-days across ${r.sessions} sessions.${r.unmatched.length ? ` ${r.unmatched.length} exercise name${r.unmatched.length > 1 ? 's' : ''} not in our library ${r.unmatched.length > 1 ? 'were' : 'was'} kept as-is (${r.unmatched.slice(0, 4).join(', ')}${r.unmatched.length > 4 ? '…' : ''}).` : ''}${r.skipped ? ` Skipped ${r.skipped} warm-up/empty rows.` : ''}`;
+        rerender(true); const m2 = $('#csvMsg'); if (m2) m2.textContent = note; else alert(note);
+      }).catch(err => { if (msg) msg.textContent = 'Import failed: ' + (err && err.message || err); });
+      t.value = ''; return;
+    }
     if (t.id === 'libLoc') { libFilter.loc = t.value; renderLibList(); return; }
     if (t.id === 'libMus') { libFilter.muscle = t.value; renderLibList(); return; }
     if (t.id === 'importFile' && t.files[0]) {
@@ -503,7 +623,8 @@
     state.profile.gyms = Array.isArray(d.gyms) ? d.gyms.slice(0, 5) : [];
     state.profile.homeGym = !!d.homeGym;
     if (state.profile.gyms.length) state.locations.gym.name = state.profile.gyms.length > 1 ? state.profile.gyms.slice(0, 2).join(' / ') : state.profile.gyms[0];
-    state.profile.goalWeight = d.goalWeight != null && d.goalWeight !== '' ? +d.goalWeight : null;
+    state.profile.goalWeight = d.goalWeight != null && d.goalWeight !== '' && +d.goalWeight > 0 ? +d.goalWeight : null;
+    state.profile.goalType = d.goalType || state.profile.goalType || null;
     state.profile.tutorialDone = !!d.tutorialDone;
     state.profile.onboardedAt = new Date().toISOString();
     state.goals = Array.isArray(d.goals) && d.goals.length ? d.goals.slice() : ['general'];
@@ -523,13 +644,21 @@
     wants.forEach(loc => {
       if (!state.locations[loc].equip.length) state.locations[loc].equip = (WO.PRESETS[loc] || WO.PRESETS.home).items.slice();
     });
+    // Chosen gym brand -> that gym's typical equipment (several gyms: what they all have, so every session works anywhere)
+    const brands = state.profile.gyms.filter(g => WO.GYM_BRANDS && WO.GYM_BRANDS[g]);
+    if (state.profile.gyms.length) {
+      const lists = state.profile.gyms.map(g => (WO.GYM_BRANDS && WO.GYM_BRANDS[g]) || WO.PRESETS.gym.items);
+      state.locations.gym.equip = lists.reduce((a, l) => a.filter(x => l.includes(x)));
+      state.profile.gymEquipFrom = brands.length ? brands.join(' + ') : 'commercial gym';
+    }
     state.setupDone = true;
     state.startDate = iso(mondayOf(new Date()));
     save();
     week = null;
   }
 
-  WO.onFlagsChange = () => { if (/^#(setup|today|day)/.test(location.hash || '#today') && $('#sheet').classList.contains('hidden')) rerender(true); };
+  // Never interrupt a session: flag changes wait until the guided session is closed or minimized.
+  WO.onFlagsChange = () => { if (document.documentElement.classList.contains('in-session')) return; if (/^#(setup|today|day|week)/.test(location.hash || '#today') && $('#sheet').classList.contains('hidden')) rerender(true); };
   WO.ui = {
     openSheet, closeSheet, setTop, esc, iso, mondayOf, rerender, route,
     getProfile: () => state.profile,
@@ -537,6 +666,7 @@
     mountDemos,
     reloadState: () => { state = load(); applyFigure(); week = null; },
     applyOnboarding,
+    getWeek, getDone, itemCard, clearItem, clearDay, savedAt: () => savedAt,
     setBetaFlag: (on) => { state.profile.betaFeatures = !!on; save(); }
   };
   route();

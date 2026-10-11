@@ -40,7 +40,8 @@
   function blank() {
     return {
       name: '',
-      goals: [],
+      goalType: '',
+      goals: [], // optional extras blended on top of the main goal type
       experience: 'some',
       gyms: [],
       homeGym: false,
@@ -55,13 +56,13 @@
 
   const QUIZ = [
     { id: 'name', title: 'What do we call you?', sub: 'First name is enough. This is your coach screen, not a corporate portal.' },
-    { id: 'goals', title: 'What’s the mission?', sub: 'Pick what you’re chasing. More than one is fine — we’ll blend the programming.' },
+    { id: 'goals', title: 'What’s the main mission?', sub: 'Pick one. It sets your reps, rest and the chart you’ll watch. Add extras below if you like.' },
     { id: 'experience', title: 'Where are you on the road?', sub: 'Be honest. The plan gets heavier or simpler from this.' },
     { id: 'train', title: 'Where do you train?', sub: 'Pick your gym (or a few), add your home setup, or both. We build around the equipment you actually have.' },
     { id: 'length', title: 'How long can a session run?', sub: 'We’ll trim volume to fit your window.' },
     { id: 'limits', title: 'Any no-go zones?', sub: 'Especially back stuff. We’ll build around it — no heroics that wreck tomorrow.' },
     { id: 'schedule', title: 'Sketch your week', sub: 'Tap each day, then set the time you’ll train. 5am Monday, noon Tuesday — whatever your week looks like.' },
-    { id: 'weight', title: 'Goal weight?', sub: 'This is the target line on your weight chart. You can change it anytime in Setup.' }
+    { id: 'weight', title: 'Goal weight?', sub: 'Optional unless you’re here to lose fat. It becomes the target line on your weight chart.' }
   ];
 
   const TIPS = [
@@ -128,7 +129,9 @@
     // Only pre-fill answers from a previous onboarding (Redo). Brand-new users start clean, not with hidden defaults.
     if (!st || !st.profile || !st.profile.onboardedAt) return;
     draft.name = st.profile.name || draft.name;
-    draft.goals = (st.goals && st.goals.slice()) || [];
+    draft.goalType = st.profile.goalType || (WO.progress ? WO.progress.goalTypeOf(st) : '');
+    const base = draft.goalType && WO.progress ? WO.progress.GOAL_TYPES[draft.goalType].goals : [];
+    draft.goals = ((st.goals && st.goals.slice()) || []).filter(g => !base.includes(g));
     draft.sessionLength = (st.profile && st.profile.sessionLength) || 60;
     draft.units = (st.profile && st.profile.units) || 'lb';
     if (st.profile && st.profile.experience) draft.experience = st.profile.experience;
@@ -154,6 +157,7 @@
     if (step === 'welcome') root.innerHTML = renderWelcome();
     else if (step === 'quiz') root.innerHTML = renderQuiz();
     else if (step === 'tutorial') root.innerHTML = renderTutorial();
+    else if (step === 'reveal') root.innerHTML = renderReveal();
     else root.innerHTML = '';
     // Animate only when the screen changes, not on every tap inside it
     const key = step + ':' + qi + ':' + tutorialI;
@@ -162,6 +166,7 @@
     if (key !== lastKey) { const sc = $('#onboardScreen'); if (sc) sc.scrollTop = 0; }
     lastKey = key;
     // Mount a tiny mannequin on form tip when available
+    if (step === 'reveal' && WO.ui && WO.ui.mountDemos) WO.ui.mountDemos(root);
     if (step === 'tutorial' && TIPS[tutorialI].demo === 'form' && WO.mountDemo && WO.EX_BY_ID && WO.EX_BY_ID.db_rdl) {
       const box = $('#obDemo');
       if (box) WO.mountDemo(box, WO.EX_BY_ID.db_rdl);
@@ -186,8 +191,11 @@
         </ul>
       </div>
       <p class="ob-verse small muted">“They shall mount up with wings as eagles; they shall run, and not be weary.”</p>
+      <p class="ob-promise small">🦅 Free plan, shown in full before any sign-up. No ads. Nothing interrupts your workout.</p>
       <button type="button" class="btn block ob-cta" data-ob="start-quiz">Let’s build your plan</button>
+      <button type="button" class="btn ghost block" data-ob="quick-start" style="margin-top:8px">⚡ Quick start — skip the quiz</button>
       <button type="button" class="linkbtn ob-skip" data-ob="skip-welcome">I’ve been here — jump to quiz</button>
+      ${!WO.authUid ? '<button type="button" class="linkbtn ob-skip" data-auth-open="signin">Already have an account? Sign in</button>' : ''}
     </div>`;
   }
 
@@ -199,9 +207,12 @@
       body = `<label class="f" for="obName">Name</label>
         <input type="text" id="obName" maxlength="32" placeholder="e.g. Alex" value="${esc(draft.name)}" autocomplete="given-name">`;
     } else if (q.id === 'goals') {
-      body = `<div class="ob-options">${Object.entries(WO.GOALS).map(([k, g]) =>
-        `<button type="button" class="ob-opt ${draft.goals.includes(k) ? 'on' : ''}" data-ob-goal="${k}"><b>${esc(g.label)}</b><span class="small muted">${esc(g.desc)}</span></button>`
-      ).join('')}</div>`;
+      const GT = WO.progress.GOAL_TYPES, base = draft.goalType ? GT[draft.goalType].goals : [];
+      body = `<div class="ob-options ob-gtypes">${Object.entries(GT).map(([k, g]) =>
+        `<button type="button" class="ob-opt ${draft.goalType === k ? 'on' : ''}" data-ob-gtype="${k}"><b>${g.icon} ${esc(g.label)}</b><span class="small muted">${esc(g.desc)}</span></button>`
+      ).join('')}</div>
+      <label class="f" style="margin-top:14px">Also blend in (optional)</label>
+      <div class="ob-gym-results">${Object.entries(WO.GOALS).filter(([k]) => !base.includes(k)).map(([k, g]) => `<button type="button" class="ob-chip ${draft.goals.includes(k) ? 'on' : ''}" data-ob-goal="${k}" title="${esc(g.desc)}">${draft.goals.includes(k) ? '✓ ' : '+ '}${esc(g.label)}</button>`).join('')}</div>`;
     } else if (q.id === 'experience') {
       body = `<div class="ob-options">${EXP.map(x =>
         `<button type="button" class="ob-opt ${draft.experience === x.id ? 'on' : ''}" data-ob-exp="${x.id}"><b>${esc(x.label)}</b><span class="small muted">${esc(x.desc)}</span></button>`
@@ -236,11 +247,12 @@
       <p class="small muted" style="margin-top:8px">Times are optional — they show on your Today screen.</p>
       <button type="button" class="btn sm ghost" style="margin-top:10px" data-ob="sched-preset">Use Mount Up default week</button>`;
     } else if (q.id === 'weight') {
+      const cut = draft.goalType === 'lose_fat';
       body = `<div class="row">
-        <div class="grow"><label class="f">Goal weight</label><input type="number" id="obGoalWt" inputmode="decimal" step="0.5" placeholder="Required" required value="${esc(draft.goalWeight)}"></div>
+        <div class="grow"><label class="f">Goal weight${cut ? '' : ' (optional)'}</label><input type="number" id="obGoalWt" inputmode="decimal" step="0.5" placeholder="${cut ? 'Required for fat loss' : 'Optional — skip it'}" ${cut ? 'required' : ''} value="${esc(draft.goalWeight)}"></div>
         <div style="width:110px"><label class="f">Units</label><select id="obUnits">${['lb', 'kg'].map(u => `<option ${draft.units === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div>
       </div>
-      <p class="small muted" style="margin-top:8px">Log weigh-ins in Food → Weekly &amp; weight to see your trend against this goal.</p>`;
+      <p class="small muted" style="margin-top:8px">${cut ? 'Log weigh-ins in Food → Weekly &amp; weight to see your trend against this goal.' : `No number needed — your progress chart tracks ${draft.goalType === 'strength' ? 'your estimated 1-rep max' : draft.goalType === 'muscle' ? 'weekly training volume' : 'sessions per week'} instead. Add one later in Setup if you want.`}</p>`;
     }
 
     const canNext = quizValid();
@@ -260,7 +272,7 @@
   function quizValid() {
     const q = QUIZ[qi];
     if (q.id === 'name') return !!(draft.name && draft.name.trim());
-    if (q.id === 'goals') return draft.goals.length > 0;
+    if (q.id === 'goals') return !!draft.goalType;
     if (q.id === 'train') return draft.gyms.length > 0 || draft.homeGym;
     if (q.id === 'limits') return draft.limitations.length > 0;
     if (q.id === 'weight') return goalWeightOk();
@@ -268,6 +280,7 @@
   }
 
   function goalWeightOk() {
+    if (draft.goalType !== 'lose_fat' && String(draft.goalWeight || '').trim() === '') return true; // optional for non-cutters
     const v = +draft.goalWeight;
     const [lo, hi] = draft.units === 'kg' ? [25, 320] : [50, 700];
     return draft.goalWeight !== '' && isFinite(v) && v >= lo && v <= hi;
@@ -343,6 +356,59 @@
     </div>`;
   }
 
+  // ---------- plan reveal: the whole plan on screen, with a "why this" line for every answer ----------
+  const fmtRest = s => s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+  const LIM_TXT = { flat_back: 'lying-flat pressing', squat_back: 'deep loaded squats', knees: 'jumping', shoulders: 'heavy overhead pressing' };
+  const EXP_WHY = { new: 'machines & dumbbells before barbell technique lifts, main lifts capped at 3 sets, demos on every move', some: 'standard double-progression: beat last week by a rep or a little weight', solid: 'full exercise menu incl. barbell lifts, progression from your own logs', veteran: 'an extra working set on main lifts; progression from your own logs' };
+  function whyLines(st, wk) {
+    const P = WO.progress, gt = P.goalTypeOf(st), G = P.GOAL_TYPES[gt];
+    const main = Object.values(wk).flatMap(s => s.items).find(i => i.main);
+    const trainDays = DAYS.filter(d => ['gym', 'home'].includes(st.schedule[d].type));
+    const splits = Array.from(new Set(trainDays.map(d => wk[d].title.replace(/\s*\(.*\)/, ''))));
+    const gymSet = WO.equipSet(st, 'gym'), homeSet = WO.equipSet(st, 'home');
+    const blocked = WO.blockedFor ? WO.blockedFor(st) : new Set();
+    const lims = (st.profile.limitations || []);
+    const L = [];
+    L.push(['Goal', `${G.icon} ${G.label}`, main ? `main lifts ${main.sets} × ${main.reps}, rest ${fmtRest(main.restAfter || main.rest)}${st.goals.includes('fat_loss') ? ', plus a fat-burning finisher' : ''}. ${G.desc.split('Chart:')[1] ? 'Your chart:' + G.desc.split('Chart:')[1] : ''}` : G.desc]);
+    const ex = EXP.find(x => x.id === st.profile.experience) || EXP[1];
+    L.push(['Experience', ex.label, EXP_WHY[ex.id]]);
+    const where = [];
+    if ((st.profile.gyms || []).length) where.push(`${WO.available(gymSet).length} exercises fit ${st.profile.gyms.join(' + ')}${st.profile.gymEquipFrom && st.profile.gymEquipFrom !== 'commercial gym' ? ` (typical ${st.profile.gymEquipFrom} equipment${st.profile.gyms.length > 1 ? ' they all share' : ''})` : ''}`);
+    if (st.profile.homeGym) where.push(`${WO.available(homeSet).length} at home`);
+    L.push(['Where', [...(st.profile.gyms || []), st.profile.homeGym ? 'Home gym' : ''].filter(Boolean).join(', ') || 'Gym', where.join('; ') + '. Swaps only offer what’s really there — edit equipment in Setup.']);
+    L.push(['Session', `${st.profile.sessionLength} min`, `up to ${WO.LENGTH_MAX[st.profile.sessionLength] || 7} exercises, ~${Math.max(...trainDays.map(d => wk[d].minutes || 0), 0)} min incl. warm-up & rest.`]);
+    L.push(['No-go zones', lims.length ? lims.map(k => (LIMS.find(x => x.id === k) || {}).label || k).join(', ') : 'None', lims.length ? `${blocked.size} moves (${lims.map(k => LIM_TXT[k] || k).join(', ')}) kept out of your plan and swaps.` : 'full exercise menu. Add limits later in Setup.']);
+    L.push(['Week', `${trainDays.length} training day${trainDays.length === 1 ? '' : 's'}`, trainDays.length ? `${splits.join(' / ')} — every muscle hit ${trainDays.length >= 3 ? 'about twice' : 'at least once'} a week, rest days between.` : 'recovery days only — add a training day in Setup.']);
+    L.push(['Goal weight', st.profile.goalWeight ? `${st.profile.goalWeight} ${st.profile.units}` : 'Not set', st.profile.goalWeight ? 'the target line on your weight chart.' : `not needed — your chart tracks ${gt === 'strength' ? 'est. 1-rep max' : gt === 'muscle' ? 'weekly volume' : gt === 'lose_fat' ? 'your weight trend' : 'sessions per week'}.`]);
+    return L;
+  }
+  function renderReveal() {
+    const st = WO.ui.getState(), wk = WO.buildWeek(st, new Date());
+    const first = DAYS.map(d => [d, wk[d]]).find(([, s]) => s.items.length && (s.type === 'gym' || s.type === 'home'));
+    const signedOut = !WO.authUid;
+    const upsell = signedOut && (!WO.flags || !WO.flags.canUpsell || WO.flags.canUpsell('reveal-save'));
+    return `<div class="ob-wrap ob-reveal">
+      <div class="tag">Your plan · free · built just now</div>
+      <h1>${esc(st.profile.name || 'Athlete')}, here’s your week.</h1>
+      <p class="ob-sub">The whole plan, right now — no sign-up, no paywall. Here’s why it looks like this:</p>
+      <div class="card why">${whyLines(st, wk).map(([k, v, why]) => `<div class="why-row"><span class="tag">${esc(k)}</span><div><b>${esc(v)}</b><div class="small muted">→ ${esc(why)}</div></div></div>`).join('')}</div>
+      <div class="section-h"><h2>This week</h2></div>
+      <div class="card" style="padding:4px 12px">${DAYS.map(d => { const s = wk[d], t = s.type === 'off' ? 'rest' : s.type; return `<div class="list-row"><div class="tag" style="width:34px">${DAY_SHORT[d]}</div><div class="grow"><b>${esc(s.title)}</b><div class="small muted">${s.items.length ? `${s.items.length} exercises · ~${s.minutes} min · ${esc(s.items.slice(0, 3).map(i => WO.EX_BY_ID[i.exId].name).join(', '))}${s.items.length > 3 ? '…' : ''}` : s.type === 'off' ? 'Day off' : 'Easy movement'}</div></div><span class="pill ${t}">${esc(s.type === 'gym' ? 'Gym' : s.type === 'home' ? 'Home' : s.type === 'rest' ? 'Recovery' : 'Off')}</span></div>`; }).join('')}</div>
+      ${first ? `<div class="section-h"><h2>First session · ${WO.DAY_NAMES[first[0]]}</h2><span class="small muted">${esc(first[1].title)}</span></div>
+      <div class="card" style="padding:4px 12px">${first[1].items.map(it => { const ex = WO.EX_BY_ID[it.exId]; return `<div class="list-row"><div class="ex-thumb" data-demo="${ex.id}" style="width:44px;height:44px;flex-basis:44px"></div><div class="grow"><b>${esc(ex.name)}</b><div class="small muted">${it.sets} × ${esc(it.reps)} · ${ex.primary.map(m => WO.MUSCLES[m]).join(', ')}</div></div></div>`; }).join('')}</div>` : ''}
+      <div class="ob-nav"><button type="button" class="btn ghost" data-ob="reveal-edit">Change answers</button><button type="button" class="btn" data-ob="reveal-go">Start training</button></div>
+      <button type="button" class="linkbtn" data-ob="reveal-tour" style="display:block;margin:8px auto;text-align:center">Show me around first (5 quick tips)</button>
+      ${upsell ? `<div class="card flat small ob-save" data-upsell="reveal-save"><b>Want it on every device?</b> <span class="muted">Optional: a free account backs up your plan and lifts. You can skip this forever.</span><div style="margin-top:8px"><button type="button" class="btn sm ghost" data-auth-open="signup">Save my plan (free)</button></div></div>` : ''}
+    </div>`;
+  }
+  function quickStart() {
+    draft = blank();
+    draft.name = draft.name || 'Athlete'; draft.goalType = 'feel_better'; draft.experience = 'some';
+    draft.gyms = ['My gym']; draft.homeGym = false; draft.sessionLength = 45; draft.limitations = ['none'];
+    applySchedulePreset();
+    commitPlan(); step = 'reveal'; paint();
+  }
+
   function applySchedulePreset() {
     const gym = draft.gyms.length > 0, home = draft.homeGym;
     if (gym && home) draft.scheduleDays = { mon: 'gym', tue: 'home', wed: 'rest', thu: 'gym', fri: 'gym', sat: 'home', sun: 'off' };
@@ -367,7 +433,8 @@
     if (!WO.ui || !WO.ui.applyOnboarding) return;
     WO.ui.applyOnboarding({
       name: draft.name.trim() || 'Athlete',
-      goals: draft.goals.length ? draft.goals.slice() : ['general'],
+      goals: Array.from(new Set((draft.goalType && WO.progress ? WO.progress.GOAL_TYPES[draft.goalType].goals : ['general']).concat(draft.goals))),
+      goalType: draft.goalType || 'feel_better',
       experience: draft.experience,
       train: trainFromDraft(),
       gyms: draft.gyms.slice(),
@@ -376,7 +443,7 @@
       limitations: draft.limitations.filter(x => x !== 'none'),
       scheduleDays: Object.assign({}, draft.scheduleDays),
       dayTimes: Object.assign({}, draft.dayTimes),
-      goalWeight: +draft.goalWeight,
+      goalWeight: String(draft.goalWeight || '').trim() === '' ? '' : +draft.goalWeight,
       units: draft.units || 'lb',
       tutorialDone: true
     });
@@ -396,12 +463,17 @@
     if (ob) {
       const a = ob.dataset.ob;
       if (a === 'start-quiz' || a === 'skip-welcome') { step = 'quiz'; qi = 0; paint(); return; }
+      if (a === 'quick-start') { quickStart(); return; }
+      if (a === 'reveal-edit') { step = 'quiz'; qi = 0; paint(); return; }
+      if (a === 'reveal-go') { finish(); return; }
+      if (a === 'reveal-tour') { step = 'tutorial'; tutorialI = 0; paint(); return; }
       if (a === 'quiz-back') { readOpenFields(); if (qi > 0) { qi--; paint(); } return; }
       if (a === 'quiz-next') {
         readOpenFields();
         if (!quizValid()) return;
         if (QUIZ[qi].id === 'train' && !scheduleFits()) applySchedulePreset();
         if (qi < QUIZ.length - 1) { qi++; paint(); }
+        else if (WO.flags && WO.flags.isOn('plan_first') && WO.progress) { commitPlan(); step = 'reveal'; paint(); } // show the plan first
         else { step = 'tutorial'; tutorialI = 0; paint(); }
         return;
       }
@@ -415,6 +487,8 @@
       }
       if (a === 'tut-skip') { finish(); return; }
     }
+    const gt = t.closest('[data-ob-gtype]');
+    if (gt) { draft.goalType = gt.dataset.obGtype; const base = WO.progress.GOAL_TYPES[draft.goalType].goals; draft.goals = draft.goals.filter(x => !base.includes(x)); paint(); return; }
     const g = t.closest('[data-ob-goal]');
     if (g) {
       const k = g.dataset.obGoal;
