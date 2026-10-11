@@ -1,0 +1,13 @@
+<!doctype html><html data-theme="dark"><head><meta charset="utf-8"><title>Mount Up mannequin strip</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>body{padding:10px;overflow:auto!important;background:var(--bg)}.row{display:flex;gap:6px;margin-bottom:8px;align-items:center}.row h4{width:110px;font:600 12px system-ui;color:var(--text);margin:0}.cell{width:200px;background:var(--bg2);border-radius:8px;padding:2px}.cell small{display:block;text-align:center;font:10px system-ui;color:var(--muted)}</style></head>
+<body><div id="g"></div>
+<script src="../js/exercises.js"></script><script src="../js/mannequin.js"></script>
+<script>
+// Usage: demo_strip.html?ids=hip_9090,pushup&ts=0,0.2,0.3,0.4,0.5&fig=female  (renders frozen phases side by side, no cues)
+const qs=new URLSearchParams(location.search),M=WO.MANNEQUIN;if(qs.get('theme'))document.documentElement.dataset.theme=qs.get('theme');if(qs.get('fig'))WO.setFigure(qs.get('fig'));
+if(qs.get('w'))document.head.insertAdjacentHTML('beforeend','<style>.cell{width:'+qs.get('w')+'px}</style>');const ts=(qs.get('ts')||'0,0.15,0.3,0.45,0.6,0.75').split(',').map(Number);
+(qs.get('ids')||'hip_9090').split(',').forEach(id=>{const ex=WO.EX_BY_ID[id],r=M.rigFor(ex),vb=M.fitBox(r,false);const row=document.createElement('div');row.className='row';row.innerHTML='<h4>'+ex.name+'</h4>';
+ ts.forEach(t=>{const c=document.createElement('div');c.className='cell';c.innerHTML='<svg viewBox="'+vb.join(' ')+'" class="demo-svg mq mq-'+WO.getFigure()+'">'+M.DEFS+'<g>'+M.render(r,t,{overlay:true,noCues:true,still:true,vb,muscles:ex.primary||[]})+'</g></svg><small>t='+t+'</small>';row.appendChild(c);});
+ document.getElementById('g').appendChild(row);});
+</script></body></html>
