@@ -746,13 +746,18 @@ html.acct-blocked .topbar,html.acct-blocked #view,html.acct-blocked .tabbar,html
   html:not([data-mu-vp]) .admin-urow.st-paused .admin-uact::before{color:var(--danger-ink)}
 }
 
-/* v23 Mount Up figure: warm skin, charcoal training kit, trainers, softer warm outline (overrides the grey v19 dummy) */
-:root{--mq-hi:#f6d2b2;--mq-mid:#dfae88;--mq-lo:#b98361;--mq-far:#b67f5c;--mq-line:#2b1a12;--mq-hl-o:.22;--mq-sh-o:.18;
-  --mq-top:#334155;--mq-top-hi:#475569;--mq-bot:#1e2633;--mq-cl-far:#141a23;--mq-shoe:#eef2f6;--mq-shoe-far:#9aa3ae;--mq-sole:#64748b;--mq-ear:#c98d68}
-html[data-theme="light"]{--mq-hi:#f3cdab;--mq-mid:#d9a47e;--mq-lo:#b07a58;--mq-far:#c99a7a;--mq-line:#4a3022;--mq-hl-o:.3;--mq-sh-o:.14;
-  --mq-top:#3d4b60;--mq-top-hi:#55657c;--mq-bot:#2a3342;--mq-cl-far:#5d6878;--mq-shoe:#ffffff;--mq-shoe-far:#c3cad3;--mq-sole:#64748b;--mq-ear:#c88b66}
-.mq-female{--mq-hi:#f4cfae;--mq-mid:#e0ad87;--mq-top:#3b3f6b;--mq-top-hi:#50558a}
-.mq .mq-ol{stroke-width:1.1}.mq .mq-ol.far{stroke-width:.9}
+/* v24 (Ronnie): back to the grey mannequin skin he liked (v19-v22 values above, NOT warm skin tones); the v23 kit stays,
+   re-toned to cool graphite so it sits on grey; trainers stay; ears + face are grey-family, quiet, not creepy */
+:root{--mq-top:#3a4452;--mq-top-hi:#4b5666;--mq-bot:#262d37;--mq-cl-far:#1b2028;--mq-shoe:#f3f5f8;--mq-shoe-far:#9aa3ae;--mq-sole:#5b6573;--mq-ear:#c3cbd6;
+  --mq-face:#2a313b;--mq-face-soft:#7f8a99}
+html[data-theme="light"]{--mq-top:#475265;--mq-top-hi:#5b677b;--mq-bot:#323a47;--mq-cl-far:#6b7583;--mq-shoe:#ffffff;--mq-shoe-far:#c3cad3;--mq-sole:#64748b;--mq-ear:#b7c0cc;
+  --mq-face:#38404c;--mq-face-soft:#7a8596}
+.mq-female{--mq-top:#434a6e;--mq-top-hi:#565e86}
 .mq .mq-cl{fill:var(--mq-bot);stroke:none}.mq .mq-cl.top{fill:var(--mq-top)}.mq .mq-cl.far{fill:var(--mq-cl-far)}
 .mq .mq-shoe{fill:var(--mq-shoe);stroke:var(--mq-sole);stroke-width:.9;stroke-linejoin:round}.mq .mq-shoe.far{fill:var(--mq-shoe-far)}
 .mq .mq-ear{fill:var(--mq-ear);stroke:var(--mq-line);stroke-width:.5;opacity:.95}
+/* v24 face: soft dark eyes (no whites/pupils), light brows, a nose hint and a gentle closed-mouth smile */
+.mq .mq-eye{fill:var(--mq-face);stroke:none}
+.mq .mq-brow{fill:none;stroke:var(--mq-face);stroke-width:.75;stroke-linecap:round;opacity:.75}
+.mq .mq-nose{fill:none;stroke:var(--mq-face-soft);stroke-width:.6;stroke-linecap:round;opacity:.9}
+.mq .mq-mouth{fill:none;stroke:var(--mq-face);stroke-width:.65;stroke-linecap:round;opacity:.8}

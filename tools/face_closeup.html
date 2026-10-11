@@ -1,0 +1,16 @@
+<!doctype html><html data-theme="dark"><head><meta charset="utf-8"><title>Mount Up mannequin face close-up</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>body{padding:10px;overflow:auto!important;background:var(--bg)}.row{display:flex;gap:8px;margin-bottom:8px;align-items:center}.row h4{width:110px;font:600 12px system-ui;color:var(--text);margin:0}.cell{width:220px;background:var(--bg2);border-radius:8px;padding:2px}.cell small{display:block;text-align:center;font:10px system-ui;color:var(--muted)}</style></head>
+<body><div id="g"></div>
+<script src="../js/exercises.js"></script><script src="../js/mannequin.js"></script>
+<script>
+// Usage: face_closeup.html?ids=bw_squat,jumping_jack&t=0&fig=female&theme=light&z=34
+// Each row: the whole figure, then a zoom on the head (z = half-size of the head box) so the face can be judged up close.
+const qs=new URLSearchParams(location.search),M=WO.MANNEQUIN;if(qs.get('theme'))document.documentElement.dataset.theme=qs.get('theme');if(qs.get('fig'))WO.setFigure(qs.get('fig'));
+const t=+(qs.get('t')||0),z=+(qs.get('z')||30);
+(qs.get('ids')||'bw_squat,jumping_jack').split(',').forEach(id=>{const ex=WO.EX_BY_ID[id],r=M.normalize(M.rigFor(ex)),vb=M.fitBox(r,false),P=M.pose(r,M.phase(r,t).q),H=P.Hd;
+ const row=document.createElement('div');row.className='row';row.innerHTML='<h4>'+ex.name+' ('+WO.getFigure()+')</h4>';
+ [[vb,'whole figure'],[[H[0]-z,H[1]-z,2*z,2*z],'head close-up']].forEach(([b,lab])=>{const c=document.createElement('div');c.className='cell';
+  c.innerHTML='<svg viewBox="'+b.join(' ')+'" class="demo-svg mq mq-'+WO.getFigure()+'">'+M.DEFS+'<g>'+M.render(r,t,{overlay:false,noCues:true,still:true,vb:b,muscles:[]})+'</g></svg><small>'+lab+'</small>';row.appendChild(c);});
+ document.getElementById('g').appendChild(row);});
+</script></body></html>

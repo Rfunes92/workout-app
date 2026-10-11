@@ -169,6 +169,26 @@
     female: { top: [[30, 49.5]], bottom: { torso: [-9, 18], thigh: [-4, 47], calf: [-4, 27] } } };
   const kit = () => KIT[FIG] || KIT.male;
 
+  // v24 face (Ronnie: "give them a face, simple but human, not creepy"): soft dark almond eyes (no whites / pupils, so no
+  // stare), light brows, a nose hint and a gentle closed-mouth smile. Authored in head-local coords and mapped by the
+  // caller's head frame, so the face turns / tilts / foreshortens with the head on every rig.
+  const qd = (m, a, c, b) => { const [A, C, Bp] = [a, c, b].map(m); return `M${f1(A[0])},${f1(A[1])} Q${f1(C[0])},${f1(C[1])} ${f1(Bp[0])},${f1(Bp[1])}`; };
+  const almond = (m, c, rx, ry) => { const pts = Array.from({ length: 12 }, (_, i) => { const t = i / 12 * 2 * Math.PI; return [c[0] + rx * Math.cos(t), c[1] + ry * Math.sin(t) * (Math.sin(t) > 0 ? 1 : 0.8)]; }); return smooth(pts.map(m)); };
+  function faceSide(m, fem) { // m: [u along the head (up), v toward the face] -> world; profile = one eye, brow, mouth (nose is in the outline)
+    const e = fem ? [20.4, 7.6] : [20.2, 8.2];
+    return `<path class="mq-eye" d="${almond(([u, v]) => m([u, v]), [e[0], e[1]], 1.15, fem ? 1.25 : 1.1)}"/>` +
+      `<path class="mq-brow" d="${qd(m, [e[0] + 2.1, e[1] - 1.5], [e[0] + 2.9, e[1] + 0.1], [e[0] + 2.4, e[1] + 1.7])}"/>` +
+      `<path class="mq-mouth" d="${fem ? qd(m, [13.2, 9.9], [12.6, 9.3], [13.1, 8.2]) : qd(m, [13.0, 10.6], [12.4, 10.0], [12.9, 8.8])}"/>`;
+  }
+  function faceFront(m, k, fem) { // m: [x right, y up] -> world, k = head width scale
+    const X = x => x * k, ey = -0.6, ex = fem ? 3.3 : 3.5, er = fem ? [1.05, 1.3] : [1.0, 1.15];
+    let o = [-1, 1].map(sg => `<path class="mq-eye" d="${almond(m, [X(sg * ex), ey], er[0] * k, er[1] * k)}"/>` +
+      `<path class="mq-brow" d="${qd(m, [X(sg * (ex - 1.7)), ey + 2.4], [X(sg * ex), ey + 3.3], [X(sg * (ex + 1.8)), ey + 2.5])}"/>`).join('');
+    o += `<path class="mq-nose" d="${qd(m, [X(-0.9), -4.9], [0, -5.7], [X(0.9), -4.9])}"/>`;
+    o += `<path class="mq-mouth" d="${fem ? qd(m, [X(-2.1), -7.6], [0, -8.7], [X(2.1), -7.6]) : qd(m, [X(-2.5), -7.7], [0, -8.8], [X(2.5), -7.7])}"/>`;
+    return o;
+  }
+
   // ---------- scenery: { d: (P, rig) -> svg, pts: (P, rig) -> extents for the viewBox } ----------
   const rectLegs = (x0, x1, top, h = 8) => `<rect x="${f1(x0)}" y="${f1(top)}" width="${f1(x1 - x0)}" height="${h}" rx="3" class="scn"/><line x1="${f1(x0 + 10)}" y1="${f1(top + h)}" x2="${f1(x0 + 10)}" y2="${FLOOR}" class="scn-l"/><line x1="${f1(x1 - 10)}" y1="${f1(top + h)}" x2="${f1(x1 - 10)}" y2="${FLOOR}" class="scn-l"/>`;
   const seg = (a, b, w, cls = 'scn-l') => `<line x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(b[0])}" y2="${f1(b[1])}" class="${cls}"${w ? ` stroke-width="${w}" stroke-linecap="round"` : ''}/>`;
@@ -473,18 +493,48 @@
         { T: 100, N: 150, t1: 80, s1: -10, t2: -55, s2: -70, fa2: 60, u1: 180, f1: 180, u2: 0, f2: 0 }],
       tl: [[0, 0], [0.15, 0], [0.32, 1], [0.48, 2], [0.66, 2], [0.82, 1], [0.98, 0], [1, 0]],
       cues: [C(0, 0.28, 'Elbow to instep'), C(0, 0.3, 'Back knee off floor'), C(0.32, 0.68, 'Rotate & reach up'), C(0.46, 0.68, 'Eyes follow hand'), C(0.7, 0.98, 'Return with control')] },
-    // v23 rewrite: Hip 90/90 Switches is now a FRONT view (camera slightly above, the way coaches film it), so the
-    // "windshield wiper" reads at a glance: both knees rise together, pass through upright, and settle to the other side.
-    // Keys are authored as picture-plane angles with foreshortening (kt/ks) for the parts that point toward/away from camera.
-    h9090: { view: 'front', anchor: ['P', [100, 150]], scene: 'floorplane', floor: false, legsFront: true, armsBehind: 1, barefoot: true, kT: 0.94, period: 6800, key: 0.06, spineOk: () => true, arcs: [],
-      frames: (() => { const arms = { ikWL: [70, 160], ikWR: [130, 160] };
-        const A = { tL: -96, ktL: 1, sL: -172, ksL: 0.34, tR: 14, ktR: 0.5, sR: -86, ksR: 1, ox: -1.5, N: 178 };      // knees to screen-left
-        const A1 = { tL: -128, ktL: 0.74, sL: -100, ksL: 0.5, tR: 90, ktR: 0.3, sR: -40, ksR: 0.9, ox: -1, N: 179 };  // knees lifting
-        const UP = { tL: -158, ktL: 0.52, sL: -24, ksL: 0.9, tR: 158, ktR: 0.52, sR: 24, ksR: 0.9, ox: 0, N: 180 };   // both knees up, feet wide
-        const mir = f => ({ tL: -f.tR, ktL: f.ktR, sL: -f.sR, ksL: f.ksR, tR: -f.tL, ktR: f.ktL, sR: -f.sL, ksR: f.ksL, ox: -f.ox, N: 360 - f.N });
-        return [A, A1, UP, mir(A1), mir(A)].map(f => X(f, arms)); })(),
-      tl: [[0, 0], [0.1, 0], [0.42, 4], [0.58, 4], [0.9, 0], [1, 0]],
-      cues: [C(0, 1, 'Sit tall, chest up'), C(0.1, 0.42, 'Knees rise & fall together'), C(0.58, 0.9, 'Knees rise & fall together'), C(0.4, 0.6, 'Both knees at 90\u00b0'), C(-0.06, 0.12, 'Both knees at 90\u00b0'), C(0.22, 0.32, 'Feet stay planted')] },
+    // v24 rebuild (Ronnie: v23 still looked "weird / sketchy"): Hip 90/90 Switches is generated from a tiny 3-D model
+    // instead of hand-authored 2-D angles. Seated, hips fixed, BOTH FEET PLANTED wide in front; each knee swings on the
+    // circle it really travels (around its hip->foot axis), so the knees rise together, pass straight up, and lay down
+    // on the other side like windshield wipers. Projected for a front camera ~26 deg above the floor; 13 dense keys per
+    // switch keep every in-between on that real path (no spline shortcuts, no crossing / sketchy limb paths).
+    h9090: { view: 'front', anchor: ['P', [100, 146]], scene: 'floorplane', floor: false, legsFront: true, armsBehind: 1, barefoot: true, hw: 8,
+      kT: 0.9, period: 7200, key: 0.06, spineOk: () => true, arcs: [],
+      frames: (() => {
+        const al = 26 * R, ca = Math.cos(al), sa = Math.sin(al), hw = 8, a = LEN.thigh, b = LEN.shank, n = 12;
+        const scr = p => [p[0], -(p[1] * ca - p[2] * sa)]; // 3-D (x right, y up, z toward camera) -> screen offset from the hip line
+        const V = { sub: (p, q) => [p[0] - q[0], p[1] - q[1], p[2] - q[2]], add: (p, q, k = 1) => [p[0] + q[0] * k, p[1] + q[1] * k, p[2] + q[2] * k],
+          dot: (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2], len: p => Math.hypot(p[0], p[1], p[2]),
+          nrm: p => { const l = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0] / l, p[1] / l, p[2] / l]; },
+          cross: (p, q) => [p[1] * q[2] - p[2] * q[1], p[2] * q[0] - p[0] * q[2], p[0] * q[1] - p[1] * q[0]] };
+        const KNEE_Y = -3.5; // hip joints 8 above the floor; a knee "on the floor" sits ~4.5 above it (knee radius)
+        const leg = sx => { // sx = -1 (screen-left leg) / +1
+          const H = [sx * hw, 0, 0], A = [sx * 50, -5, 30], ax = V.sub(A, H), d = V.len(ax), nn = V.nrm(ax);
+          const along = (a * a - b * b + d * d) / (2 * d), r = Math.sqrt(Math.max(0, a * a - along * along)), C = V.add(H, nn, along);
+          const u0 = V.nrm(V.sub([0, 1, 0], [nn[0] * nn[1], nn[1] * nn[1], nn[2] * nn[1]])); let w = V.cross(nn, u0); if (w[0] < 0) w = w.map(x => -x);
+          const knee = ph => V.add(V.add(C, u0, r * Math.cos(ph)), w, r * Math.sin(ph));
+          const drop = sg => { let lo = 0, hi = 100 * R; if (knee(sg * hi)[1] > KNEE_Y) return sg * hi; for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (knee(sg * m)[1] > KNEE_Y) lo = m; else hi = m; } return sg * lo; };
+          const pa = -drop(-1), pb = drop(1); // knee-on-floor swivel to the left / right
+          return { H, A, knee, phi: t => (pb + pa) / 2 * t + (pb - pa) / 2 * t * t }; // smooth, monotonic -pa -> +pb
+        };
+        const L = leg(-1), Rr = leg(1);
+        // hands rest on the floor just behind / outside the hips (support to sit tall); arms are drawn behind the legs
+        const hand = sx => { const p = scr([sx * 25, -8, -16]); return [100 + p[0], 148 + p[1]]; }, handL = hand(-1), handR = hand(1);
+        const out = [];
+        for (let i = 0; i <= n; i++) {
+          const t = -1 + 2 * i / n, f = { N: 180, ox: 0, ikWL: handL, ikWR: handR, kuL: 0.84, kfL: 0.84, kuR: 0.84, kfR: 0.84 }; // arms angle back to the floor (foreshortened), elbows stay out of the knees' way
+          // knee + ankle are keyed as screen POSITIONS relative to the hip joint (pkx/pky, pax/pay), not angles: blending
+          // positions between dense keys follows the real knee path even where a thigh points at the camera (an angle
+          // blend would spin the limb there); the angles/foreshortening are derived from those points in poseF
+          [['L', L], ['R', Rr]].forEach(([sd, lg]) => { const K = scr(V.sub(lg.knee(lg.phi(t)), lg.H)), An = scr(V.sub(lg.A, lg.H));
+            f['pkx' + sd] = K[0]; f['pky' + sd] = K[1]; f['pax' + sd] = An[0]; f['pay' + sd] = An[1]; });
+          // draw order: the leg whose knee is nearer the camera goes on top; it only flips at the upright pass, where the legs are apart
+          f.lz = t < 0 ? -1 : 1; f.N = 180 + 4 * t; // head follows the knees a touch
+          out.push(f);
+        }
+        return out; })(),
+      tl: [[0, 0], [0.1, 0], [0.42, 12], [0.58, 12], [0.9, 0], [1, 0]],
+      cues: [C(0, 1, 'Sit tall, chest up'), C(0.1, 0.42, 'Knees rise & fall together'), C(0.58, 0.9, 'Knees rise & fall together'), C(0.22, 0.32, 'Feet stay planted'), C(0.4, 0.6, 'Both knees at 90\u00b0'), C(-0.06, 0.12, 'Both knees at 90\u00b0')] },
     couch: { anchor: ['K1', [70, 174]], scene: 'couch', period: 5200, key: 0.62, arcs: [['S', 'H', 'K1']],
       frames: [{ T: 165, t1: -15, s1: 180, fa1: 180, t2: 88, s2: 0, fa2: 90, u1: 36, f1: 36 }, { T: 184, t1: -15, s1: 180, fa1: 180, t2: 88, s2: 0, fa2: 90, u1: 30, f1: 30 }],
       tl: [[0, 0], [0.15, 0], [0.45, 1], [0.85, 1], [1, 0]],
@@ -700,7 +750,10 @@
     J.HL = add(add(J.P, lat, -hw), d, -2); J.HR = add(add(J.P, lat, hw), d, -2);
     J.N0 = add(J.P, d, 48 * q.kT); const SC = add(J.N0, lat, q.tw * 5), sw = F.sw * (1 - 0.32 * Math.abs(q.tw));
     J.SL = add(SC, lat, -sw); J.SR = add(SC, lat, sw);
-    const legs = () => { ['L', 'R'].forEach(s => { J['K' + s] = add(J['H' + s], dir(q['t' + s]), LEN.thigh * q['kt' + s]); J['A' + s] = add(J['K' + s], dir(q['s' + s]), LEN.shank * q['ks' + s]); }); };
+    const legs = () => { ['L', 'R'].forEach(s => { if (q['pkx' + s] != null) { // v24: positional keys (knee/ankle relative to the hip joint)
+      J['K' + s] = add(J['H' + s], [q['pkx' + s], q['pky' + s]]); J['A' + s] = add(J['H' + s], [q['pax' + s], q['pay' + s]]);
+      q['t' + s] = ang(sub(J['K' + s], J['H' + s])); q['s' + s] = ang(sub(J['A' + s], J['K' + s])); return; }
+      J['K' + s] = add(J['H' + s], dir(q['t' + s]), LEN.thigh * q['kt' + s]); J['A' + s] = add(J['K' + s], dir(q['s' + s]), LEN.shank * q['ks' + s]); }); };
     const arms = () => { ['L', 'R'].forEach(s => { J['E' + s] = add(J['S' + s], dir(q['u' + s]), LEN.ua * q['ku' + s]); J['W' + s] = add(J['E' + s], dir(q['f' + s]), LEN.fa * q['kf' + s]); }); };
     legs(); arms();
     const A = J[rig.anchor[0]], off = [rig.anchor[1][0] - A[0] + q.ox, rig.anchor[1][1] - A[1] + q.oy];
@@ -787,7 +840,8 @@
     s += `<path class="mq-crease" d="${limb(P.H, P.K1, TH, LEN.thigh)}"/>`; // faint hip crease so a raised thigh still reads in front of the belly
     s += mus('torso', 1, P.H) + mus('thigh', 1, P.H, P.K1) + mus('calf', 1, P.K1, P.A1);
     s += `<path class="mq-hair" d="${smooth(sh.hair.map(hf))}"/>`;
-    s += `<path class="mq-ear" d="${smooth([[13.4, -0.6], [16.6, 1.2], [21.4, 0.8], [22.4, -2.2], [19.6, -4], [15, -3.6]].map(hf))}"/>`; // ear: reads as a person, not a dummy
+    s += `<path class="mq-ear" d="${smooth([[13.4, -0.6], [16.6, 1.2], [21.4, 0.8], [22.4, -2.2], [19.6, -4], [15, -3.6]].map(([u, v]) => hf([18 + (u - 18) * 0.78, -1.2 + (v + 1.2) * 0.78])))}"/>`; // ear (v24: smaller, so it reads as an ear, not a headphone)
+    s += faceSide(hf, FIG === 'female');
     // props carried on the body
     const u = dir(q.T), fr = [-u[1], u[0]];
     if (pr === 'db1' && rig.propAt === 'hips') s += hex(add(P.H, fr, 12), 'mq-db');
@@ -825,8 +879,15 @@
     const legCaps = sd => [[P['K' + sd], 5.6], [P['A' + sd], 3.8]];
     const KT = kit(), B = KT.bottom;
     const fBand = (a, b, local, L, r, sd) => { const c = r && clipU(local, r[0], r[1]); return c ? `<path class="mq-cl" d="${limb(a, b, c, L, outward(a, b, sd))}"/>` : ''; };
-    const legKit = sd => fBand(P['H' + sd], P['K' + sd], F.thigh, LEN.thigh, B.thigh, sd) + fBand(P['K' + sd], P['A' + sd], F.calf, LEN.shank, B.calf, sd) + (rig.barefoot ? '' : `<path class="mq-shoe" d="${footD(P['K' + sd], P['A' + sd])}"/>`);
-    const legTop = sd => legKit(sd) + limbMus('thigh', P['H' + sd], P['K' + sd], sd) + limbMus('calf', P['K' + sd], P['A' + sd], sd);
+    const endOn = sd => Math.max(0, Math.min(1, (0.5 - Math.hypot(P['K' + sd][0] - P['H' + sd][0], P['K' + sd][1] - P['H' + sd][1]) / LEN.thigh) / 0.25));
+    const kneeCovered = !!(B.thigh && B.thigh[1] >= 44); // tights reach the knee: the end-on knee is fabric, not skin
+    const legKit = sd => (kneeCovered ? fBand(P['H' + sd], P['K' + sd], F.thigh, LEN.thigh, B.thigh, sd) : endOn(sd) > 0.99 ? '' : `<g style="opacity:${(1 - endOn(sd)).toFixed(2)}">${fBand(P['H' + sd], P['K' + sd], F.thigh, LEN.thigh, B.thigh, sd)}</g>`) + fBand(P['K' + sd], P['A' + sd], F.calf, LEN.shank, B.calf, sd) + (rig.barefoot ? '' : `<path class="mq-shoe" d="${footD(P['K' + sd], P['A' + sd])}"/>`);
+    // v24: a thigh pointing at the camera (90/90 switches) shows its knee end-on: fade a round kneecap in on top of the
+    // shorts as the thigh foreshortens, so the knee reads as a knee instead of a dark squashed band
+    const kneeOn = sd => { const o = endOn(sd);
+      const K = P['K' + sd], a = ang(sub(K, P['H' + sd])), e = ellipse(K, F.thigh[0][1] * 0.86, 8.6, a + 180);
+      return o > 0.01 ? `<g style="opacity:${o.toFixed(2)}"><g class="mq-ol"><path d="${e}"/></g>${kneeCovered ? `<path class="mq-cl" d="${e}"/>` : `<g class="mq-fill"><path d="${e}"/></g>`}</g>` : ''; };
+    const legTop = sd => legKit(sd) + kneeOn(sd) + limbMus('thigh', P['H' + sd], P['K' + sd], sd) + limbMus('calf', P['K' + sd], P['A' + sd], sd);
     const pr = rig.prop || 'none';
     const armParts = sd => [limb(P['S' + sd], P['E' + sd], F.ua, LEN.ua, outward(P['S' + sd], P['E' + sd], sd)), limb(P['E' + sd], P['W' + sd], F.fa, LEN.fa, outward(P['E' + sd], P['W' + sd], sd))];
     const armCaps = sd => [[P['E' + sd], 4.8], [P['W' + sd], 3.9]];
@@ -842,13 +903,15 @@
       (back ? `<path class="mq-hair" d="${ellipse(add(P.Hd, up, 1.5), F.head[0] + 0.8, F.head[1] + (FIG === 'female' ? 0.6 : -0.6), q.N)}"/>` : `<path class="mq-hair" d="${hp(FRONT_HAIR[FIG] || FRONT_HAIR.male)}"/>`);
     // each leg / arm is its own silhouette so the inner contours (between the legs, arm against the torso) stay readable
     const arms = () => armPre('L') + armPre('R') + solid(armParts('L'), armCaps('L'), 'near') + armTop('L') + solid(armParts('R'), armCaps('R'), 'near') + armTop('R');
-    const legs = () => solid(legParts('L'), legCaps('L'), 'near') + legTop('L') + solid(legParts('R'), legCaps('R'), 'near') + legTop('R');
+    const legOne = sd => solid(legParts(sd), legCaps(sd), 'near') + legTop(sd);
+    const legs = () => (q.lz > 0 ? legOne('R') + legOne('L') : legOne('L') + legOne('R')); // v24: q.lz > 0 puts the left leg on top
     const tBand = (r, top) => { const c = clipU(mirror(F.torso), r[0], r[1]); if (!c) return '';
       // tops get arm-holes: above the chest the garment narrows to straps so delts + traps stay bare (no boxy apron)
       const ah = (u, v) => (top && u > r[1] - 13 ? Math.sign(v) * Math.min(Math.abs(v), Math.max(6, 18 - (u - (r[1] - 13)) * 0.95)) : v);
       return smooth(c.map(([u, v]) => tf([u * kT, ah(u, v)]))); };
     const ears = back ? '' : [-1, 1].map(sg => `<path class="mq-ear" d="${ellipse(add(add(P.Hd, rt, sg * (F.head[0] + 0.4)), up, -0.5), 1.7, 3, q.N)}"/>`).join('');
-    const core = () => ears + solid([torsoD, neckD, headD], [], 'near') + KT.top.map(r => `<path class="mq-cl top" d="${tBand(r, true)}"/>`).join('') + `<path class="mq-cl" d="${tBand(B.torso)}"/>` + torsoMus + hair;
+    const face = back ? '' : faceFront(([x, y]) => add(add(P.Hd, rt, x), up, y), F.head[0] / 9.4, FIG === 'female');
+    const core = () => ears + solid([torsoD, neckD, headD], [], 'near') + KT.top.map(r => `<path class="mq-cl top" d="${tBand(r, true)}"/>`).join('') + `<path class="mq-cl" d="${tBand(B.torso)}"/>` + torsoMus + face + hair;
     let s = rig.armsBehind ? arms() : '';
     s += rig.legsFront ? core() + legs() : legs() + core();
     if (!rig.armsBehind) s += arms();
