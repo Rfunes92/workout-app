@@ -1,0 +1,18 @@
+<!doctype html><html data-theme="dark" data-mu-vp="grid"><head><meta charset="utf-8"><title>Mount Up hero-lift grid</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>html,body{max-width:none!important;width:auto!important}body{padding:10px!important;overflow:auto!important;background:#fff!important;margin:0!important;display:block!important}.g{display:grid;grid-template-columns:repeat(var(--cols,4),var(--w,240px));gap:0;border-left:1px solid #d6d9de;border-top:1px solid #d6d9de;width:max-content}
+.c{border-right:1px solid #d6d9de;border-bottom:1px solid #d6d9de;background:var(--mq-stage,#fff);position:relative}.c .demo{margin:0;border:0;border-radius:0}.c small{position:absolute;left:6px;top:4px;font:600 10px system-ui;color:#7b838f}</style></head>
+<body><div class="g" id="g"></div>
+<script src="../js/exercises.js"></script><script src="../js/mannequin.js"></script>
+<script>
+// Usage: hero_grid.html?ids=bb_bench,cable_curl&fig=female&cols=4&w=240&t=key|0.3 (or ts=0,0.25,0.5 for a strip per id)&overlay=1&cues=1&labels=0&ids=all
+// Each cell is a real app .demo container, frozen at the rig's key pose (or t), so it shows exactly what the app draws.
+const qs=new URLSearchParams(location.search),M=WO.MANNEQUIN;if(qs.get('theme'))document.documentElement.dataset.theme=qs.get('theme');if(qs.get('fig'))WO.setFigure(qs.get('fig'));
+const root=document.documentElement.style;if(qs.get('cols'))root.setProperty('--cols',qs.get('cols'));if(qs.get('w'))root.setProperty('--w',qs.get('w')+'px');
+const HERO='bb_bench,cable_curl,incline_db_press,leg_extension,farmer_carry,bb_ohp,cable_row,ez_curl,bb_row,db_row,pushup,lat_pulldown';
+const ids=qs.get('ids')==='all'?WO.EXERCISES.map(e=>e.id):(qs.get('ids')||HERO).split(','),tqs=(qs.get('ts')||qs.get('t')||'key').split(',');
+ids.forEach(id=>tqs.forEach(tq=>{const ex=WO.EX_BY_ID[id];if(!ex)return;const r=M.rigFor(ex),t=tq==='key'?r.key:+tq,vb=M.fitBox(r,false);
+ const c=document.createElement('div');c.className='c';
+ c.innerHTML='<div class="demo"><svg viewBox="'+vb.join(' ')+'" class="demo-svg mq mq-'+WO.getFigure()+'">'+M.DEFS+'<g>'+M.render(r,t,{overlay:qs.get('overlay')==='1',noCues:qs.get('cues')!=='1',still:true,vb,muscles:ex.primary||[]})+'</g></svg></div>'+(qs.get('labels')==='0'?'':'<small>'+ex.name+(tqs.length>1?' · t='+tq:'')+'</small>');
+ document.getElementById('g').appendChild(c);}));
+</script></body></html>

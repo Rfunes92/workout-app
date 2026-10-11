@@ -143,3 +143,10 @@ At ≥900px wide, `#admin` uses a sidebar + wide content layout (user table, 3-c
 - **Firebase Auth login is NOT deleted** (that needs the Admin SDK). Remove it in Firebase console → Authentication → Users (or add a Cloud Function later). Until then the tombstone keeps them locked out of all app data.
 - Enforced by `firestore.rules`: paused/deleted users can read only their own profile doc; no read/write of synced data, no profile edits, can't delete/recreate the profile, can't change `status`. Only the admin can set status, never on the admin's own uid/email. **Publish the rules in the Firebase console** (Firestore → Rules) or Pause/Delete get "Permission denied".
 - Rules tests: `tools/rules_test.mjs` (Firestore emulator, 34 cases). Screenshots: `node tools/admin_status_shots.mjs http://localhost:8000 screenshots/admin-v22 1280 800 desktop-` → `screenshots/admin-v22/`.
+
+## v25 — anatomical mannequins (`mountup-v25`)
+All 121 exercise demos use the new Lyfta-clean anatomical style (our own artwork, drawn from our rigs; nothing traced):
+- **Figure**: light studio stage (both themes), pale-grey anatomical body with a faint muscle-group mesh (`MESH` panels + `DEFL` definition lines in `js/mannequin.js`). Male: bare torso + dark shorts. Female: sports top + shorts. Faces kept.
+- **Targets**: primary muscles in red with a soft glow (`#mqRed` + `#mqGlow`), brightest at the key pose. When the target is the chest / lats / upper back, the near arm is drawn behind the torso so the red is never hidden. Front-view moves where the thighs cover the target (Russian twist, 90/90) show a soft red "x-ray". Banded lateral walk is now seen from behind (glutes).
+- **Cues**: lighter (thin guide line, quiet angle arcs, smaller frosted chips).
+- **Tools**: `tools/hero_grid.html` (frozen app demos in a grid: `?ids=all|a,b&fig=female&t=key|ts=0,0.3`). `node tools/audit_poses.js`, `node tools/audit_motion.js` and `node tools/check_demos.js` all pass.

@@ -761,3 +761,30 @@ html[data-theme="light"]{--mq-top:#475265;--mq-top-hi:#5b677b;--mq-bot:#323a47;-
 .mq .mq-brow{fill:none;stroke:var(--mq-face);stroke-width:.75;stroke-linecap:round;opacity:.75}
 .mq .mq-nose{fill:none;stroke:var(--mq-face-soft);stroke-width:.6;stroke-linecap:round;opacity:.9}
 .mq .mq-mouth{fill:none;stroke:var(--mq-face);stroke-width:.65;stroke-linecap:round;opacity:.8}
+/* ---------- v25 anatomical mannequin (Lyfta-clean look, our own artwork) ----------
+   Light "studio" stage in BOTH themes so the grey anatomical figure + red target muscles read like an atlas plate.
+   All figure colours are set on the svg (.mq) itself, so they win over the theme-level vars without touching the app theme. */
+.demo,.mistake figure svg{background:radial-gradient(circle at 50% 38%,#ffffff 0%,#f4f5f7 55%,#e7eaee 100%)}
+.ex-thumb{background:linear-gradient(180deg,#ffffff,#eef0f3)}
+.mq{--mq-hi:#fbfbfc;--mq-mid:#d3d7dd;--mq-lo:#a3aab4;--mq-far:#bfc4cb;--mq-line:#2a2e35;--mq-guide:#9aa2ad;--mq-db:#2b2f36;--mq-hub:#a0a7b1;
+  --mq-hl-o:.4;--mq-sh-o:.1;--mq-hair:#2e2620;--mq-plate:#1e2227;--mq-top:#2c3139;--mq-top-hi:#3a404a;--mq-bot:#1f2227;--mq-cl-far:#40454d;
+  --mq-shoe:#eef0f3;--mq-shoe-far:#d6dae0;--mq-sole:#5f6773;--mq-ear:#e2e5e9;--mq-face:#2b3038;--mq-face-soft:#8d95a1;
+  --demo-floor:#cfd3d9;--scn:#2f343b;--scn-l:#b9bfc8;--cable:#5d6570;--mq-def:#6f7782;
+  --mq-red:#e2362a;--mq-red-hi:#ff6b55;--mq-red-lo:#a9180f;--mq-ink:#353b44;--mq-chip:rgba(255,255,255,.84)}
+.mq.mq-female{--mq-top:#2f333b}
+.mq .mq-ol{stroke-width:1.2}.mq .mq-ol.far{stroke-width:1}
+.mq .mq-mus{fill:url(#mqRed);stroke:var(--mq-red-lo);stroke-width:.35;stroke-linejoin:round;filter:url(#mqGlow)}
+.mq .mq-mus.sec{fill:var(--mq-red);stroke:none;filter:none}
+.mq .mq-mesh path{fill:url(#mqPanel);stroke:var(--mq-def);stroke-width:.45;stroke-opacity:.6;stroke-linejoin:round;stroke-linecap:round}
+.mq .mq-mesh path.ln{fill:none;stroke-opacity:.5}
+.mq-female .mq-mesh path{stroke-opacity:.4}.mq-female .mq-mesh path.ln{stroke-opacity:.3}
+.mq .mq-crease{opacity:.22}
+/* lighter coaching overlay: thin guide, quiet angle arcs, frosted cue chips */
+.mq .mq-spine{stroke:var(--mq-guide);stroke-width:.9;opacity:.5}.mq .mq-spine.ok{stroke:#2f9e62;opacity:.55}.mq .mq-spine.bad{opacity:.9}
+.mq .mq-arc{stroke:#d48a10;stroke-width:.8;opacity:.6}.mq .mq-deg{font:600 5.2px system-ui,sans-serif;fill:#a86d0c;opacity:.8}
+.mq .mq-cue rect{fill:var(--mq-chip);stroke:rgba(42,46,53,.14);stroke-width:.5}.mq .mq-cue text{font:600 6.2px system-ui,sans-serif;fill:var(--mq-ink)}
+.mq .mq-note{fill:#8d95a1}
+.mq .mq-pin rect{fill:var(--mq-chip);stroke:rgba(59,130,246,.4);stroke-width:.5}.mq .mq-pin text{fill:var(--mq-ink);font-weight:600}
+.mq .mq-pin-l{opacity:.45}.mq .mq-pin-b circle{stroke:#fff}
+.scn-plane{fill:var(--scn);opacity:.3}.mq .scn-plane{fill:#dde0e5;opacity:1;stroke:#c9ced5;stroke-width:.8}
+.mq .mq-ghost{opacity:.55}
