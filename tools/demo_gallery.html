@@ -10,7 +10,7 @@ if(fig&&WO.setFigure)WO.setFigure(fig);if(t!=null)WO.MANNEQUIN.freeze=(t==='key'
 let list=WO.EXERCISES;if(only)list=only.split(',').map(i=>WO.EX_BY_ID[i]);if(qs.get('from'))list=list.slice(+qs.get('from'),+qs.get('to'));
 const stick=[];
 list.forEach(ex=>{const c=document.createElement('div');c.className='c';c.innerHTML='<div class="demo"></div><b>'+ex.name+' <small>('+ex.id+')</small></b>';g.appendChild(c);
- WO.mountDemo(c.querySelector('.demo'),ex);if(!c.querySelector('svg.mq')){c.classList.add('stick');stick.push(ex.id);}
+ WO.mountDemo(c.querySelector('.demo'),ex,{coach:qs.get('coach')==='1'});if(!c.querySelector('svg.mq')){c.classList.add('stick');stick.push(ex.id);}
 });
 sum.textContent=list.length+' exercises · stick fallback: '+stick.length+' '+stick.join(' ');
 </script></body></html>

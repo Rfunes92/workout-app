@@ -80,6 +80,22 @@
     return null;
   }
 
+  // v19 one-day location override ("Today only: Home / Gym"): state.dayLoc = { 'YYYY-MM-DD': 'home' | 'gym' }.
+  // It swaps that date's equipment (and so its exercises) but never touches the weekly schedule or the focus.
+  const isoD = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  function dayDate(date, day) { const m = new Date(date.getFullYear(), date.getMonth(), date.getDate()); m.setDate(m.getDate() - ((m.getDay() + 6) % 7) + DAYS.indexOf(day)); return m; }
+  function locOverride(state, date, day) {
+    const t = state.schedule[day] && state.schedule[day].type; if (t !== 'gym' && t !== 'home') return null;
+    const v = (state.dayLoc || {})[isoD(dayDate(date || new Date(), day))];
+    return (v === 'gym' || v === 'home') && v !== t ? v : null;
+  }
+  // warm-up swaps: mobility / activation moves the location's equipment supports (injury filter is applied by the sheet)
+  function warmupOptions(state, sess, item) {
+    const set = equipSet(state, sess.loc), cur = WO.EX_BY_ID[item.exId], inWu = new Set(sess.warmup.map(i => i.exId));
+    const near = e => e.primary.some(m => cur.primary.includes(m) || cur.secondary.includes(m)) ? 0 : 1;
+    return WO.EXERCISES.filter(e => e.id !== cur.id && !inWu.has(e.id) && e.slots.includes('mobility') && e.id !== 'foam_roll' && canDo(e, set)).sort((a, b) => near(a) - near(b));
+  }
+
   function blockWeek(state, date) {
     const start = new Date(state.startDate + 'T00:00:00');
     const diff = Math.floor((date - start) / (7 * 864e5));
@@ -158,7 +174,8 @@
       sess.loc = 'muaythai'; sess.locName = state.locations.muaythai.name; sess.title = 'Muay Thai + Mobility';
       sess.notes.push('Class is your main workout today. Do this light complement before/after — no heavy lifting.');
       ['worlds_greatest', 'hip_9090', 'ankle_rocks', 'open_book', 'band_pull_apart'].forEach(id => {
-        const ex = WO.EX_BY_ID[id]; if (ex && canDo(ex, set) && limOk(id)) sess.warmup.push(mk(ex, presc(ex, false, goals), { key: 'w-' + id }));
+        const ex = WO.EX_BY_ID[id], sw = state.swaps[`${day}:w-${id}`], se = sw && WO.EX_BY_ID[sw] && canDo(WO.EX_BY_ID[sw], set) ? WO.EX_BY_ID[sw] : null;
+        if (ex && canDo(ex, set) && limOk(id)) sess.warmup.push(mk(se || ex, presc(se || ex, false, goals), { key: 'w-' + id, slot: 'mobility', warm: true }));
       });
       [['dead_bug', { sets: 2, reps: '8/side', rest: 30 }], ['side_plank', { sets: 2, reps: '20–30s/side', rest: 30 }], ['couch_stretch', { sets: 1, reps: '45s/side', rest: 0 }]]
         .map(([id, p]) => [safeId(id, set), p, id]).filter(([id]) => id).forEach(([id, p, orig]) => {
@@ -168,8 +185,10 @@
       return sess;
     }
 
-    const loc = sch.type === 'gym' ? 'gym' : 'home';
+    const ovr = locOverride(state, date, day);
+    const loc = ovr || (sch.type === 'gym' ? 'gym' : 'home');
     const set = equipSet(state, loc);
+    if (ovr) { sess.type = loc; sess.schedType = sch.type; sess.locOverride = true; }
     const tpl = TEMPLATES[focus] || TEMPLATES.fullA;
     sess.loc = loc; sess.locName = state.locations[loc].name; sess.focus = focus;
     sess.title = tpl.title;
@@ -213,8 +232,11 @@
     const wu = isLower ? ['worlds_greatest', 'hip_9090', 'deep_squat_hold'] : ['band_dislocates', 'band_pull_apart', 'open_book', 'cat_cow'];
     const cardioWU = loc === 'gym' ? 'bike or treadmill' : 'jumping jacks / jump rope';
     sess.warmupText = `5 min easy ${cardioWU}, then the mobility below, then 1–2 lighter ramp-up sets of your first lift.`;
+    // v19: warm-ups are swappable like main lifts (key stays the plan's pick, so done-ticks survive a swap); a saved swap
+    // only sticks while today's location can actually do it (e.g. a band move swapped in at the gym drops out at Home)
+    const wuEx = (key, id) => { const sw = state.swaps[`${day}:${key}`], se = sw && WO.EX_BY_ID[sw]; return se && canDo(se, set) ? se : WO.EX_BY_ID[id]; };
     wu.filter(id => canDo(WO.EX_BY_ID[id], set) && limOk(id)).slice(0, goals.includes('mobility') ? 3 : 2).forEach(id => {
-      const ex = WO.EX_BY_ID[id]; sess.warmup.push(mk(ex, presc(ex, false, goals), { key: 'w-' + id }));
+      const ex = wuEx('w-' + id, id); sess.warmup.push(mk(ex, presc(ex, false, goals), { key: 'w-' + id, slot: 'mobility', warm: true }));
     });
 
     // finisher
@@ -257,6 +279,7 @@
   }
 
   function swapOptions(state, sess, item) {
+    if (item.warm) return warmupOptions(state, sess, item);
     const set = equipSet(state, sess.loc);
     const slot = item.slot;
     const ex = WO.EX_BY_ID[item.exId];
@@ -279,5 +302,5 @@
     'Sleep 7+ hours; 5 am sessions mean an early night the evening before.'
   ];
 
-  Object.assign(WO, { LIMIT_BLOCK, LENGTH_MAX, blockedFor, DAYS, DAY_NAMES, GOALS, TEMPLATES, FOCUS_OPTIONS, equipSet, canDo, available, buildWeek, swapOptions, blockWeek, OVERLOAD, FAT_LOSS_TIPS, candidates });
+  Object.assign(WO, { LIMIT_BLOCK, LENGTH_MAX, blockedFor, DAYS, DAY_NAMES, GOALS, TEMPLATES, FOCUS_OPTIONS, equipSet, canDo, available, buildWeek, swapOptions, warmupOptions, locOverride, dayDate, blockWeek, OVERLOAD, FAT_LOSS_TIPS, candidates });
 })();

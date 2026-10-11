@@ -118,6 +118,7 @@ function mergeWorkout(dev, cl) {
   o.done = Object.assign({}, dev.done);
   Object.entries(cl.done || {}).forEach(([d, v]) => { o.done[d] = Object.assign({}, o.done[d], v); });
   o.swaps = Object.assign({}, dev.swaps, cl.swaps);
+  o.dayLoc = Object.assign({}, dev.dayLoc, cl.dayLoc); // v19 one-day Home/Gym overrides
   // v18 lift history: union per exercise per day (a day logged on both devices keeps the one with more sets)
   o.hist = {};
   [dev.hist || {}, cl.hist || {}].forEach(src => Object.entries(src).forEach(([id, list]) => {

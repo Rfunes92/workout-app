@@ -31,7 +31,7 @@
       },
       custom: { gym: [], home: [], muaythai: [] },
       schedule: defaultSchedule(),
-      swaps: {}, done: {}, log: {}, hist: {}, days: {},
+      swaps: {}, done: {}, log: {}, hist: {}, days: {}, dayLoc: {},
       startDate: iso(mondayOf(new Date()))
     };
   }
@@ -79,6 +79,8 @@
     // prune done-logs older than 21 days
     const cutoff = iso(new Date(Date.now() - 21 * 864e5));
     Object.keys(state.done).forEach(k => { if (k < cutoff) delete state.done[k]; });
+    // one-day location overrides only matter for their own date: drop them once that date has passed
+    const today0 = iso(new Date()); state.dayLoc = state.dayLoc || {}; Object.keys(state.dayLoc).forEach(k => { if (k < today0) delete state.dayLoc[k]; });
     persistNow();
     week = null;
   }
@@ -169,11 +171,21 @@
       </div>${progHtml}</div>`;
   }
 
-  function compactRow(day, it) {
+  function compactRow(day, it, opts) {
     const ex = WO.EX_BY_ID[it.exId]; const v = getDone(day, it.key, 1)[0];
+    const swappable = it.warm && !(opts && opts.noSwap), swapped = swappable && state.swaps[`${day}:${it.key}`] && it.exId === state.swaps[`${day}:${it.key}`];
     return `<div class="wu-row"><div class="ex-thumb" data-open="${ex.id}" data-demo="${ex.id}" style="width:44px;height:44px;flex-basis:44px"></div>
-      <div class="grow" data-open="${ex.id}" style="cursor:pointer"><b>${esc(ex.name)}</b><div class="small muted">${esc(it.reps)}</div></div>
+      <div class="grow" data-open="${ex.id}" data-ctx="${day}|${it.key}" style="cursor:pointer"><b>${esc(ex.name)}</b><div class="small muted">${esc(it.reps)}${swapped ? ' · swapped' : ''}</div></div>
+      ${swappable ? `<button class="btn sm ghost wu-swap" data-swap="${day}|${it.key}" aria-label="Swap ${esc(ex.name)}">⇄ Swap</button>` : ''}
       <button class="set ${v ? 'on' : ''}" data-set="0" data-day="${day}" data-key="${it.key}" data-rest="0" aria-label="Done">${v ? '✓' : ''}</button></div>`;
+  }
+  // v19 "Today only: Home / Gym": a one-date location override (state.dayLoc) that rebuilds just this session with the
+  // other location's equipment; the weekly schedule is untouched and the override expires after the date
+  function todayLocCtl(day, s) {
+    const base = s.schedType || s.type; if (base !== 'gym' && base !== 'home') return '';
+    const cur = s.type, k = iso(dateForDay(day));
+    return `<div class="today-loc" role="radiogroup" aria-label="Where are you training today?"><span class="small muted">Today only:</span><div class="seg">${[['gym', '🏋 ' + state.locations.gym.name], ['home', '🏠 ' + state.locations.home.name]].map(([v, l]) => `<button type="button" role="radio" aria-checked="${cur === v}" class="${cur === v ? 'on' : ''}" data-dayloc="${v}" data-date="${k}">${esc(l)}</button>`).join('')}</div>
+      ${s.locOverride ? `<div class="small muted">Switched for today — your weekly plan still says ${esc(locLabel(base))}. <a href="#" data-dayloc="reset" data-date="${k}">Undo</a></div>` : ''}</div>`;
   }
   function renderDay(day) {
     const wk = getWeek(); const s = wk[day];
@@ -190,10 +202,11 @@
     let h = '';
     if (!state.setupDone) h += `<div class="banner"><div class="grow"><b>Finish coach setup</b><div class="small muted">Welcome → quiz → tutorial builds your plan. Takes a few minutes.</div></div><button type="button" class="btn sm" data-ob-open>Mount Up</button></div>`;
     h += dayStrip(day);
-    h += `<div class="hero ${t}"><div class="row between"><span class="tag">${esc(hello)}</span><span class="pill ${t}">${esc(locLabel(s.type))}${s.time ? ' · ' + fmtTime(s.time) : ''}</span></div>
+    h += `<div class="hero ${t}"><div class="row between"><span class="tag">${esc(hello)}</span><span class="pill ${t}">${esc(locLabel(s.type))}${s.locOverride ? ' · today only' : ''}${s.time ? ' · ' + fmtTime(s.time) : ''}</span></div>
       <h1 style="margin-top:6px">${esc(s.title)}</h1>
       <div class="stats"><div><b>${s.items.length + (s.finisher ? 1 : 0)}</b>exercises</div><div><b>~${s.minutes || 0}</b>min</div><div><b>${doneSets}/${totalSets}</b>sets</div></div>
       <div class="progress"><div style="width:${pct}%"></div></div>
+      ${isToday ? todayLocCtl(day, s) : ''}
       ${WO.session && WO.flags.isOn('session_player') && allItems.length ? `<div class="row" style="gap:8px;margin-top:12px"><button type="button" class="btn ghost sm grow" data-sess-preview="${day}">👁 Preview</button><button type="button" class="btn sm grow" data-sess-start="${day}">▶ ${pct ? 'Continue' : 'Start'} session</button></div>` : ''}</div>`;
     if (WO.session && WO.flags.isOn('session_player')) h = h.replace(dayStrip(day), dayStrip(day) + WO.session.bannerHtml(day));
     s.notes.forEach(n => { h += `<div class="note">${esc(n)}</div>`; });
@@ -201,6 +214,7 @@
       h += `<div class="section-h"><h2>${s.type === 'muaythai' ? 'Pre-class mobility' : 'Warm-up'}</h2><span class="small muted">${s.type === 'muaythai' ? '~8 min' : '~6 min'}</span></div>`;
       if (s.warmupText) h += `<div class="small muted" style="margin:0 2px">${esc(s.warmupText)}</div>`;
       h += `<div class="card" style="padding:4px 12px">${s.warmup.map(it => compactRow(day, it)).join('')}</div>`;
+      if (s.warmup.some(it => it.warm)) h += `<div class="small muted" style="margin:4px 2px 0">Warm-up swaps only show moves your ${esc(s.locName)} equipment supports${(state.profile.limitations || []).length ? ' and your no-go zones allow' : ''}.</div>`;
     }
     if (s.items.length) {
       h += `<div class="section-h"><h2>${s.type === 'muaythai' ? 'After class (optional)' : s.type === 'rest' ? 'Recovery' : 'Workout'}</h2>${s.items.some(i => i.group) ? '<span class="small muted">A1/A2 = superset</span>' : ''}</div>`;
@@ -404,9 +418,9 @@
     const lims = (state.profile.limitations || []).map(k => LIM_LABELS[k] || k);
     const opts = showFlagged ? all : all.filter(e => !blocked.has(e.id)), flagged = all.filter(e => blocked.has(e.id));
     const inPlan = new Set(Object.values(getWeek()).flatMap(x => [...x.items, ...(x.finisher ? [x.finisher] : [])].map(i => i.exId)));
-    const noGear = key === 'fin' ? [] : WO.EXERCISES.filter(e => e.id !== cur.id && e.slots.includes(it.slot) && !WO.canDo(e, set));
+    const noGear = key === 'fin' || it.warm ? [] : WO.EXERCISES.filter(e => e.id !== cur.id && e.slots.includes(it.slot) && !WO.canDo(e, set));
     const gearTxt = e => e.req.filter(r => !r.split('|').some(o => set.has(o))).map(r => r.split('|').map(x => WO.EQUIPMENT[x].label).join(' / ')).join(' + ');
-    const html = `<div class="sheet-head"><div><div class="tag">Swap exercise · ${esc(s.locName)}</div><h1 style="font-size:21px;margin-top:4px">Replace ${esc(cur.name)}</h1></div><button class="close-x" data-close aria-label="Close">✕</button></div>
+    const html = `<div class="sheet-head"><div><div class="tag">${it.warm ? 'Swap warm-up' : 'Swap exercise'} · ${esc(s.locName)}</div><h1 style="font-size:21px;margin-top:4px">Replace ${esc(cur.name)}</h1></div><button class="close-x" data-close aria-label="Close">✕</button></div>
       <div class="small muted" style="margin:6px 0">Real alternatives from the full library that your <b>${esc(s.locName)}</b> equipment supports${lims.length ? ` and that respect <b>${esc(lims.join(', '))}</b>` : ''}. Same movement pattern first.</div>
       <div class="card" style="padding:4px 12px">${opts.map(e => `<div class="list-row" data-doswap="${e.id}"><div class="ex-thumb" data-demo="${e.id}" style="width:48px;height:48px;flex-basis:48px"></div><div class="grow"><b>${esc(e.name)}</b><div class="small muted">${e.primary.map(m => WO.MUSCLES[m]).join(', ')}${inPlan.has(e.id) ? ' · in your plan' : ' · new to your plan'}</div></div><span class="pill ${blocked.has(e.id) ? 'warn' : ''}">${blocked.has(e.id) ? '⚠ flagged' : e.slots.includes(it.slot) ? 'same pattern' : 'same muscles'}</span></div>`).join('') || '<div class="empty">No alternatives with this equipment.</div>'}</div>
       ${flagged.length ? `<button class="btn ghost sm block" data-swap-flagged="${esc(ctx)}">${showFlagged ? 'Hide' : 'Show'} ${flagged.length} move${flagged.length > 1 ? 's' : ''} flagged for ${esc(lims.join(', '))}</button>` : ''}
@@ -495,6 +509,10 @@
     const cv = t.closest('[data-coach-view]');
     if (cv) { coachView = cv.dataset.coachView; const c = $('[data-coach-demo]'), ex = c && WO.EX_BY_ID[c.dataset.coachDemo]; if (ex) { WO.mountDemo(c, ex, { coach: true, speed: coachSpeed, view: coachView }); const ctl = cv.closest('.coach-ctl'); const tmp = document.createElement('div'); tmp.innerHTML = coachControls(ex); ctl.replaceWith(tmp.firstElementChild); } return; }
     const sf = t.closest('[data-swap-flagged]'); if (sf) { showFlagged = !showFlagged; showSwap(sf.dataset.swapFlagged); return; }
+    const dl = t.closest('[data-dayloc]');
+    if (dl) { e.preventDefault(); const k = dl.dataset.date, v = dl.dataset.dayloc, day = dayKeyOf(new Date()), base = state.schedule[day] && state.schedule[day].type;
+      state.dayLoc = state.dayLoc || {}; if (v === 'reset' || v === base) delete state.dayLoc[k]; else state.dayLoc[k] = v;
+      save(); rerender(true); return; }
     const sw = t.closest('[data-swap]'); if (sw) { showFlagged = false; showSwap(sw.dataset.swap); return; }
     const ds = t.closest('[data-doswap]');
     if (ds && sheetCtx) {

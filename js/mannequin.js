@@ -22,6 +22,9 @@
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
   const unit = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; };
   const lerpA = (a, b, k) => a + (b - a) * k;
+  const nrm = a => ((a + 180) % 360 + 360) % 360 - 180;
+  // a limb pair bends naturally if the elbow flexes forward (rel >= 0) / the knee folds back (rel <= 0); fully folded counts as natural
+  const natural = (j, [up, lo]) => { const r = nrm(lo - up); return Math.abs(r) > 172 || (j[0] === 'W' ? r >= -3 : r <= 3); };
 
   // ---------- figure (male / female) ----------
   let FIG = 'male';
@@ -70,6 +73,10 @@
       fa: [[-2, 3.8], [8, 4.2], [22, 3], [30, 2.3], [30, -2.3], [16, -3], [2, -3.6]],
       head: [9, 11], neck: 4.6 }
   };
+  // v19 build: fuller, more muscular silhouettes (male most); the *B shapes are what gets drawn, muscles scale with them
+  const BUILD = { male: { torso: 1.07, thigh: 1.12, calf: 1.12, ua: 1.14, fa: 1.12 }, female: { torso: 1.03, thigh: 1.06, calf: 1.05, ua: 1.08, fa: 1.06 } };
+  Object.keys(SH).forEach(f => { const b = BUILD[f], S = SH[f]; S.build = b; ['torso', 'thigh', 'calf', 'ua', 'fa'].forEach(k => { S[k + 'B'] = S[k].map(([u, v]) => [u, v * b[k]]); }); });
+  Object.keys(SHF).forEach(f => { const b = BUILD[f], S = SHF[f]; S.build = b; ['thigh', 'calf', 'ua', 'fa'].forEach(k => { S[k] = S[k].map(([u, v]) => [u, v * b[k]]); }); S.torso = S.torso.map(([u, v]) => [u, v * b.torso]); S.sw *= b.torso; });
   const figShapes = () => SH[FIG] || SH.male, figFront = () => SHF[FIG] || SHF.male;
 
   // ---------- muscles ----------
@@ -235,7 +242,7 @@
     pushup: { anchor: ['A1', [34, 177]], period: 4400, key: 0.53, spineOk: () => true, arcs: [['S', 'E1', 'W1'], ['S', 'H', 'A1']],
       frames: [{ T: 117, t1: -63, s1: -63, fa1: 24, ikW1: [156, 178], ikW2: [156, 178] }, { T: 98, t1: -82, s1: -82, fa1: 12, ikW1: [156, 178], ikW2: [156, 178] }], tl: TL2,
       cues: [C(0, 1, 'Straight line head to heels'), C(0.12, 0.46, 'Elbows ~45°'), C(0.44, 0.62, 'Chest to an inch off floor'), C(0.62, 0.94, 'Push the floor away')] },
-    pike: { anchor: ['A1', [50, 177]], period: 4400, key: 0.53, spineOk: () => true, arcs: [['S', 'E1', 'W1'], ['S', 'H', 'K1']],
+    pike: { anchor: ['A1', [52, 172]], period: 4400, key: 0.53, spineOk: () => true, arcs: [['S', 'E1', 'W1'], ['S', 'H', 'K1']],
       frames: [{ T: 58, t1: -22, s1: -22, fa1: 40, ikW1: [118, 178], ikW2: [118, 178] }, { T: 34, t1: -18, s1: -18, fa1: 40, ikW1: [118, 178], ikW2: [118, 178] }], tl: TL2,
       cues: [C(0, 0.4, 'Hips high, inverted V'), C(0.14, 0.46, 'Lower head between hands'), C(0.44, 0.62, 'Elbows back, not flared'), C(0.62, 0.94, 'Press back up')] },
     dbfly: { anchor: ['H', BENCH_H], scene: 'bench', prop: 'db2', period: 4800, key: 0.52, arcs: [['S', 'E1', 'W1']],
@@ -266,11 +273,11 @@
     srow: { anchor: ['H', [62, 168]], prop: 'handle', lines: [['W1', [208, 126], 'cable']], tower: 210, scene: 'tower', period: 4400, key: 0.53, spineOk: q => q.T > 168, arcs: [['S', 'E1', 'W1']],
       frames: [{ T: 154, t1: 100, s1: 80, fa1: 172, u1: 92, f1: 92 }, { T: 184, t1: 100, s1: 80, fa1: 172, u1: -42, f1: 86 }], tl: TL2,
       cues: [C(0, 0.3, 'Tall spine, chest up'), C(0.15, 0.46, 'Row to lower ribs'), C(0.44, 0.62, 'Squeeze shoulder blades'), C(0.62, 0.94, 'Reach forward slowly')] },
-    invrow: { anchor: ['A1', [158, 176]], scene: 'lowbar', bar: [45, 70], period: 4400, key: 0.53, spineOk: () => true, arcs: [['S', 'E1', 'W1'], ['S', 'H', 'A1']], sg: { W1: -1, W2: -1 },
-      frames: [{ T: -110, t1: 70, s1: 70, fa1: 160, ikW1: [45, 74], ikW2: [45, 74] }, { T: -125, t1: 55, s1: 55, fa1: 145, ikW1: [45, 74], ikW2: [45, 74] }], tl: TL2,
+    invrow: { anchor: ['A1', [158, 176]], scene: 'lowbar', bar: [71, 86], period: 4400, key: 0.53, spineOk: () => true, arcs: [['S', 'E1', 'W1'], ['S', 'H', 'A1']],
+      frames: [{ T: -109, t1: 71, s1: 71, fa1: 161, ikW1: [71, 88], ikW2: [71, 88] }, { T: -128, t1: 52, s1: 52, fa1: 142, ikW1: [71, 88], ikW2: [71, 88] }], tl: TL2,
       cues: [C(0, 1, 'Body straight as a plank'), C(0.15, 0.46, 'Pull chest to bar'), C(0.44, 0.62, 'Squeeze shoulder blades'), C(0.62, 0.94, 'Lower under control')] },
     ytw: { anchor: ['H', [92, 171]], period: 7200, key: 0.2, spine: true, spineOk: () => true, arcs: [],
-      frames: [{ T: 91, N: 96, t1: -90, s1: -90, fa1: -96, u1: 104, f1: 106 }, { T: 91, N: 96, t1: -90, s1: -90, fa1: -96, u1: 176, f1: 176, ku1: 0.3, kf1: 0.3 }, { T: 91, N: 96, t1: -90, s1: -90, fa1: -96, u1: -118, ku1: 0.55, f1: 122, kf1: 0.6 }],
+      frames: [{ T: 91, N: 96, t1: -90, s1: -90, fa1: -96, u1: 104, f1: 106 }, { T: 91, N: 96, t1: -90, s1: -90, fa1: -96, u1: 176, f1: 176, ku1: 0.3, kf1: 0.3 }, { T: 91, N: 96, t1: -90, s1: -90, fa1: -96, u1: 262, ku1: 0.55, f1: 80, kf1: 0.6 }],
       tl: [[0, 0], [0.1, 0], [0.18, 0], [0.32, 1], [0.48, 1], [0.62, 2], [0.8, 2], [0.94, 0], [1, 0]],
       cues: [C(0, 0.3, 'Y \u2014 thumbs up, arms long'), C(0.3, 0.6, 'T \u2014 squeeze shoulder blades'), C(0.6, 0.94, 'W \u2014 elbows to back pockets'), C(0, 1, 'Forehead hovers')] },
     pullup: { anchor: ['W1', [104, 26]], scene: 'bar', bar: [56, 152, 24], floor: false, period: 4600, key: 0.53, spineOk: () => true, arcs: [['S', 'E1', 'W1']],
@@ -289,7 +296,7 @@
       frames: [{ T: 160, t1: 12, s1: -6, u1: 140, f1: 140 }, { T: 160, t1: 12, s1: -6, u1: 6, f1: 6 }], tl: TL2,
       cues: [C(0, 1, 'Arms stay straight'), C(0.14, 0.46, 'Sweep to thighs'), C(0.44, 0.62, 'Squeeze lats'), C(0.62, 0.94, 'Control back up')] },
     facepull: { anchor: ['A1', ST], prop: 'handle', lines: [['W1', [208, 30], 'cable']], tower: 211, scene: 'tower', period: 4400, key: 0.53, arcs: [['S', 'E1', 'W1']],
-      frames: [X(STD, { T: 176, u1: 94, f1: 96 }), X(STD, { T: 178, u1: -78, ku1: 0.45, f1: 142 })], tl: TL2,
+      frames: [X(STD, { T: 176, u1: 94, f1: 96 }), X(STD, { T: 178, u1: -76, ku1: 0.36, f1: 168, kf1: 0.92 })], tl: TL2,
       cues: [C(0, 0.3, 'Rope at face height'), C(0.14, 0.46, 'Pull to forehead'), C(0.44, 0.62, 'Elbows high, thumbs back'), C(0.62, 0.94, 'Slow return')] },
     // ===== legs =====
     bsquat: { anchor: ['A1', ST], prop: 'bar', propAt: 'back', period: 4600, key: 0.53, arcs: [['S', 'H', 'K1'], ['H', 'K1', 'A1']],
@@ -298,12 +305,12 @@
       frames: [X({ T: 180, t1: 0, s1: 0 }, ARMS_RACK), X({ T: 150, t1: 88, s1: -30 }, ARMS_RACK)], tl: TL2,
       cues: [C(0.1, 0.6, 'Elbows high'), C(0.2, 0.6, 'Torso stays upright'), C(0.44, 0.62, 'Sit straight down'), C(0.62, 0.9, 'Drive up, elbows lead'), C(0.88, 1.12, 'Stand tall')] },
     hack: { anchor: ['A1', [102, 172]], scene: 'hack', period: 4600, key: 0.53, arcs: [['S', 'H', 'K1'], ['H', 'K1', 'A1']], spineOk: () => true,
-      frames: [{ T: 202, t1: 20, s1: 18, fa1: 100, ru1: -8, rf1: 168 }, { T: 202, t1: 108, s1: -14, fa1: 100, ru1: -8, rf1: 168 }], tl: TL2,
+      frames: [{ T: 202, t1: 20, s1: 18, fa1: 100, ru1: 20, rf1: 158 }, { T: 202, t1: 108, s1: -14, fa1: 100, ru1: 20, rf1: 158 }], tl: TL2,
       cues: [C(0, 0.4, 'Back flat on the pad'), C(0.2, 0.6, 'Knees track over toes'), C(0.44, 0.62, 'Deep as you control'), C(0.62, 0.94, 'Drive through whole foot')] },
     bwsquat: { anchor: ['A1', ST], period: 4400, key: 0.53, arcs: [['S', 'H', 'K1'], ['H', 'K1', 'A1']],
       frames: [{ T: 180, t1: 0, s1: 0, u1: 4, f1: 6 }, { T: 140, t1: 86, s1: -30, u1: 84, f1: 86 }], tl: TL2, cues: SQ_CUES },
     deepsq: { anchor: ['A1', ST], period: 7000, key: 0.5, arcs: [['S', 'H', 'K1'], ['H', 'K1', 'A1']],
-      frames: [{ T: 150, t1: 112, s1: -34, ru1: 62, rf1: 150 }, { T: 154, t1: 110, s1: -33, ru1: 60, rf1: 150 }], tl: TLHOLD,
+      frames: [{ T: 150, t1: 112, s1: -34, ru1: 58, rf1: 164, kf1: 0.78 }, { T: 154, t1: 110, s1: -33, ru1: 56, rf1: 164, kf1: 0.78 }], tl: TLHOLD,
       cues: [C(0, 0.5, 'Heels down'), C(0.25, 0.8, 'Elbows push knees out'), C(0.5, 1.02, 'Chest up, breathe')] },
     tke: { anchor: ['A1', ST], lines: [['K1', [196, 136], 'band']], scene: 'post', postX: 196, postY: 120, period: 3800, key: 0.53, arcs: [['H', 'K1', 'A1']],
       frames: [X(HIPS, { T: 172, t1: 26, s1: -16, t2: -14, s2: -10, fa2: 70 }), X(HIPS, { T: 176, t1: 0, s1: 0, t2: -14, s2: -10, fa2: 70 })], tl: TL2,
@@ -339,7 +346,7 @@
       frames: [{ T: 180, t1: 2, s1: -2, t2: 0, s2: -6, fa2: 80, u1: 2, f1: 2 }, { T: 96, t1: 20, s1: -6, t2: -82, s2: -84, fa2: 4, u1: 0, f1: 0 }], tl: TL2,
       cues: [C(0.12, 0.5, 'Hips square to floor'), C(0.2, 0.62, 'Back leg in line with torso'), C(0.46, 0.66, 'Flat back'), C(0.64, 0.94, 'Squeeze glute to stand')] },
     backext: { anchor: ['H', [100, 110]], scene: 'hyper', period: 4600, key: 0.53, spineOk: q => q.T > 90, arcs: [['S', 'H', 'K1']],
-      frames: [{ T: 132, t1: -48, s1: -48, fa1: 40, ru1: 22, rf1: 196 }, { T: 30, t1: -48, s1: -48, fa1: 40, ru1: 22, rf1: 196, B: 3 }],
+      frames: [{ T: 132, t1: -48, s1: -48, fa1: 40, ru1: 18, rf1: 166, kf1: 0.8 }, { T: 30, t1: -48, s1: -48, fa1: 40, ru1: 18, rf1: 166, kf1: 0.8, B: 3 }],
       tl: [[0, 0], [0.12, 0], [0.46, 1], [0.6, 1], [0.92, 0], [1, 0]],
       cues: [C(0, 0.3, 'Pad below hip crease'), C(0.14, 0.46, 'Lower with control'), C(0.62, 0.94, 'Squeeze glutes to rise'), C(0.88, 1.1, 'Stop at a straight line')] },
     pullthru: { anchor: ['A1', [104, 176]], prop: 'handle', lines: [['W1', [10, 168], 'cable']], tower: 8, scene: 'tower', period: 4600, key: 0.53, spineOk: q => q.T < 168, arcs: [['S', 'H', 'K1']],
@@ -351,14 +358,14 @@
       frames: [{ T: 180, t1: 0, s1: 0, u1: 88, f1: 88 }, { T: 105, t1: 25, s1: -4, u1: -39, f1: -39 }],
       tl: [[0, 0], [0.1, 0], [0.45, 1], [0.52, 1], [0.85, 0], [1, 0]],
       cues: [C(0.28, 0.56, 'Hike it back'), C(0.38, 0.6, 'Flat back'), C(0.54, 0.84, 'Snap hips forward'), C(0.84, 1.1, 'Float \u2014 arms just guide')] },
-    thrust: { anchor: ['S', [54, 132]], scene: 'box', box: [2, 58, 138], prop: 'bar', propAt: 'hips', period: 4600, key: 0.53, spineOk: () => true, arcs: [['S', 'H', 'K1'], ['H', 'K1', 'A1']], ik: { W1: ['H', [4, -13]], W2: ['H', [4, -13]] }, sg: { W1: 1, W2: 1 },
+    thrust: { anchor: ['S', [54, 132]], scene: 'box', box: [2, 58, 138], prop: 'bar', propAt: 'hips', period: 4600, key: 0.53, spineOk: () => true, arcs: [['S', 'H', 'K1'], ['H', 'K1', 'A1']], ik: { W1: ['H', [2, -12]], W2: ['H', [2, -12]] },
       frames: [{ T: -124, t1: 30, s1: 10, ikA1: [142, 176], ikA2: [142, 176], fa1: 90, N: -140 }, { T: -92, t1: 30, s1: 10, ikA1: [142, 176], ikA2: [142, 176], fa1: 90, N: -112 }], tl: TL2,
       cues: [C(0, 0.4, 'Upper back on bench edge'), C(0.14, 0.46, 'Drive through heels'), C(0.44, 0.62, 'Chin tucked, ribs down'), C(0.46, 0.64, 'Squeeze glutes hard'), C(0.62, 0.94, 'Lower under control')] },
     bridge: { anchor: ['S', [52, 170]], period: 4400, key: 0.53, spineOk: () => true, arcs: [['S', 'H', 'K1']],
-      frames: [{ T: -90, t1: 30, s1: 10, ikA1: [128, 177], ikA2: [128, 177], u1: 82, f1: 88, N: -96 }, { T: -66, t1: 30, s1: 10, ikA1: [128, 177], ikA2: [128, 177], u1: 82, f1: 88, N: -90 }], tl: TL2,
+      frames: [{ T: -90, t1: 30, s1: 10, ikA1: [128, 177], ikA2: [128, 177], u1: 84, wy1: 176, N: -96 }, { T: -66, t1: 30, s1: 10, ikA1: [128, 177], ikA2: [128, 177], u1: 84, wy1: 176, N: -90 }], tl: TL2,
       cues: [C(0, 0.4, 'Feet flat, knees bent'), C(0.14, 0.46, 'Drive through heels'), C(0.44, 0.62, 'Squeeze glutes at top'), C(0.62, 0.94, 'Lower slowly')] },
     ballcurl: { anchor: ['S', [48, 170]], scene: 'ball', period: 4600, key: 0.53, spineOk: () => true, arcs: [['H', 'K1', 'A1']],
-      frames: [{ T: -76, t1: 80, s1: 80, ikA1: [156, 150], ikA2: [156, 150], fa1: 170, u1: 82, f1: 88, N: -92 }, { T: -62, t1: 80, s1: 80, ikA1: [122, 150], ikA2: [122, 150], fa1: 170, u1: 82, f1: 88, N: -90 }], tl: TL2,
+      frames: [{ T: -76, t1: 80, s1: 80, ikA1: [156, 150], ikA2: [156, 150], fa1: 170, u1: 84, wy1: 176, N: -92 }, { T: -62, t1: 80, s1: 80, ikA1: [122, 150], ikA2: [122, 150], fa1: 170, u1: 84, wy1: 176, N: -90 }], tl: TL2,
       cues: [C(0, 1, 'Hips stay high'), C(0.14, 0.46, 'Curl ball toward glutes'), C(0.44, 0.62, 'Squeeze hamstrings'), C(0.62, 0.94, 'Extend slowly')] },
     kickback: { anchor: ['A2', [92, 176]], prop: 'none', lines: [['A1', [150, 174], 'cable']], tower: 152, scene: 'tower', period: 4200, key: 0.53, spineOk: () => true, arcs: [['S', 'H', 'K1']],
       frames: [{ T: 160, t2: 6, s2: 0, t1: 4, s1: -12, fa1: 70, ikW1: [138, 92], ikW2: [138, 92] }, { T: 160, t2: 6, s2: 0, t1: -42, s1: -50, fa1: 30, ikW1: [138, 92], ikW2: [138, 92] }], tl: TL2,
@@ -376,7 +383,7 @@
       frames: [X(STD, { T: 172, u1: -4, f1: 152 }), X(STD, { T: 172, u1: -2, f1: 2 })], tl: TL2,
       cues: [C(0, 0.62, 'Elbows pinned at sides'), C(0.14, 0.46, 'Push to full lockout'), C(0.44, 0.62, 'Squeeze triceps'), C(0.62, 0.94, 'Up to ~90° slowly')] },
     ohext: { anchor: ['A1', ST], prop: 'dbo', period: 4400, key: 0.53, arcs: [['S', 'E1', 'W1']],
-      frames: [X(STD, { u1: 176, f1: -14 }), X(STD, { u1: 176, f1: -182 })], tl: [[0, 1], [0.12, 1], [0.46, 0], [0.6, 0], [0.92, 1], [1, 1]],
+      frames: [X(STD, { u1: 176, f1: -32 }), X(STD, { u1: 176, f1: -182 })], tl: [[0, 1], [0.12, 1], [0.46, 0], [0.6, 0], [0.92, 1], [1, 1]],
       cues: [C(0, 0.62, 'Elbows point up'), C(0.14, 0.46, 'Lower behind head'), C(0.44, 0.62, 'Deep triceps stretch'), C(0.62, 0.94, 'Extend overhead')] },
     skull: { anchor: ['H', BENCH_H], scene: 'bench', prop: 'db2', period: 4200, key: 0.53, arcs: [['S', 'E1', 'W1']],
       frames: [X({ u1: 196, f1: 196 }, LYING), X({ u1: 196, f1: 300 }, LYING)], tl: TL2,
@@ -388,8 +395,8 @@
     plank: { anchor: ['A1', [36, 177]], period: 6400, key: 0, spineOk: () => true, arcs: [['S', 'H', 'A1']],
       frames: [{ T: 106, t1: -78, s1: -78, fa1: 18, u1: 0, f1: 92, kf1: 0.95 }, { T: 105, t1: -79, s1: -79, fa1: 18, u1: 0, f1: 92, kf1: 0.95 }], tl: TLHOLD, cues: PLANK_CUES },
     deadbug: { anchor: ['H', [104, 170]], period: 8000, key: 0.26, spineOk: () => true, arcs: [],
-      frames: [{ T: -90, N: -94, u1: 180, f1: 180, t1: 180, s1: 90, fa1: 180 }, { T: -90, N: -94, u1: -96, f1: -96, u2: 180, f2: 180, t1: 180, s1: 90, fa1: 180, t2: 98, s2: 94, fa2: 150 },
-        { T: -90, N: -94, u1: 180, f1: 180, t1: 180, s1: 90, fa1: 180 }, { T: -90, N: -94, u1: 180, f1: 180, u2: -96, f2: -96, t1: 98, s1: 94, fa1: 150, t2: 180, s2: 90, fa2: 180 }], tl: TL4,
+      frames: [{ T: -90, N: -94, u1: 180, f1: 180, t1: 180, s1: 90, fa1: 180 }, { T: -90, N: -94, u1: 266, f1: 266, u2: 180, f2: 180, t1: 180, s1: 90, fa1: 180, t2: 98, s2: 94, fa2: 150 },
+        { T: -90, N: -94, u1: 180, f1: 180, t1: 180, s1: 90, fa1: 180 }, { T: -90, N: -94, u1: 180, f1: 180, u2: 266, f2: 266, t1: 98, s1: 94, fa1: 150, t2: 180, s2: 90, fa2: 180 }], tl: TL4,
       cues: [C(0, 1, 'Low back glued to floor'), C(0.12, 0.34, 'Opposite arm & leg reach long'), C(0.62, 0.84, 'Switch sides'), C(0.34, 0.48, 'Exhale, return slow')] },
     birddog: { anchor: ['H', [100, 136]], period: 8000, key: 0.26, spineOk: () => true, arcs: [['S', 'H', 'K2']],
       frames: [X(QUAD, { N: 104 }), X(QUAD, { N: 106, u1: 100, f1: 100, t2: -88, s2: -88, fa2: -84 }), X(QUAD, { N: 104 }), X(QUAD, { N: 106, u2: 100, f2: 100, t1: -88, s1: -88, fa1: -84 })], tl: TL4,
@@ -425,7 +432,7 @@
       tl: BIKE_FRAMES.map((_, i) => [i / 8, i]).concat([[1, 8]]),
       cues: [C(0, 1, 'Seat at hip height'), C(0.1, 0.6, 'Smooth circles'), C(0.5, 1, 'Stay seated, drive hard')] },
     rower: { anchor: ['H', [92, 164]], scene: 'rower', prop: 'handle', lines: [['W1', [204, 150], 'cable']], period: 3200, key: 0.4, spineOk: () => true, arcs: [['H', 'K1', 'A1']],
-      frames: [{ T: 156, ox: 32, u1: 94, f1: 94, ikA1: [168, 162], ikA2: [168, 162], fa1: 140, fa2: 140 }, { T: 172, ox: 0, u1: 92, f1: 92, ikA1: [168, 162], ikA2: [168, 162], fa1: 140, fa2: 140 }, { T: 200, ox: -2, u1: -44, f1: 88, ikA1: [168, 162], ikA2: [168, 162], fa1: 140, fa2: 140 }],
+      frames: [{ T: 170, ox: 30, u1: 92, f1: 92, ikA1: [168, 162], ikA2: [168, 162], fa1: 140, fa2: 140 }, { T: 172, ox: 0, u1: 92, f1: 92, ikA1: [168, 162], ikA2: [168, 162], fa1: 140, fa2: 140 }, { T: 200, ox: -2, u1: -44, f1: 88, ikA1: [168, 162], ikA2: [168, 162], fa1: 140, fa2: 140 }],
       tl: [[0, 0], [0.06, 0], [0.24, 1], [0.36, 2], [0.46, 2], [0.62, 1], [0.94, 0], [1, 0]],
       cues: [C(0, 0.26, 'Legs drive first'), C(0.22, 0.42, 'Then hips, then arms'), C(0.46, 0.94, 'Arms, hips, legs to return'), C(0.6, 1, 'Powerful, not rushed')] },
     jumprope: { anchor: ['A1', ST], prop: 'rope', period: 900, key: 0.5, spineOk: () => true, arcs: [],
@@ -448,12 +455,18 @@
         { T: 100, N: 150, t1: 80, s1: -10, t2: -55, s2: -70, fa2: 60, u1: 180, f1: 180, u2: 0, f2: 0 }],
       tl: [[0, 0], [0.15, 0], [0.32, 1], [0.48, 2], [0.66, 2], [0.82, 1], [0.98, 0], [1, 0]],
       cues: [C(0, 0.28, 'Elbow to instep'), C(0, 0.3, 'Back knee off floor'), C(0.32, 0.68, 'Rotate & reach up'), C(0.46, 0.68, 'Eyes follow hand'), C(0.7, 0.98, 'Return with control')] },
-    h9090: { anchor: ['H', [100, 166]], period: 6400, key: 0.05, spineOk: () => true,
-      frames: [{ T: 180, t1: 80, s1: -90, ks1: 0.3, fa1: 90, fs1: 0.5, t2: -90, kt2: 0.35, s2: -80, fa2: -90, fs2: 0.8, u1: -25, f1: -25 },
-        { T: 180, t1: 130, s1: -25, t2: 130, s2: -25, u1: -25, f1: -25 },
-        { T: 180, t1: 80, kt1: 0.35, s1: -80, fa1: -90, fs1: 0.8, t2: 80, s2: -90, ks2: 0.3, fa2: 90, fs2: 0.5, u1: -25, f1: -25 },
-        { T: 180, t1: 130, s1: -25, t2: 130, s2: -25, u1: -25, f1: -25 }],
-      tl: [[0, 0], [0.12, 0], [0.3, 1], [0.48, 2], [0.62, 2], [0.8, 3], [0.98, 4], [1, 4]],
+    h9090: { anchor: ['H', [100, 166]], period: 6400, key: 0.05, spineOk: () => true, linear: true, outOfPlane: true,
+      // v19: the switching knee drops sideways (thigh foreshortens through the in-between frames) and the thigh angles are
+      // unwrapped so no leg ever swings down through the floor or straight up; feet pivot heel-down
+      frames: [{ T: 180, t1: 80, kt1: 1, s1: -90, ks1: 0.3, fa1: 90, fs1: 0.5, t2: -90, kt2: 0.35, s2: -80, ks2: 1, fa2: -90, fs2: 0.8, u1: -25, f1: -25 },
+        { T: 180, t1: 105, kt1: 1, s1: -58, ks1: 0.65, fa1: 90, fs1: 0.75, t2: -160, kt2: 0.2, s2: -60, ks2: 1, fa2: -180, fs2: 0.6, u1: -25, f1: -25 },
+        { T: 180, t1: 130, kt1: 1, s1: -25, ks1: 1, fa1: 90, fs1: 1, t2: -230, kt2: 1, s2: -25, ks2: 1, fa2: -270, fs2: 1, u1: -25, f1: -25 },
+        { T: 180, t1: 200, kt1: 0.2, s1: -55, ks1: 1, fa1: 180, fs1: 0.6, t2: -255, kt2: 1, s2: -57, ks2: 0.65, fa2: -270, fs2: 0.75, u1: -25, f1: -25 },
+        { T: 180, t1: 270, kt1: 0.35, s1: -80, ks1: 1, fa1: 270, fs1: 0.8, t2: -280, kt2: 1, s2: -90, ks2: 0.3, fa2: -270, fs2: 0.5, u1: -25, f1: -25 },
+        { T: 180, t1: 200, kt1: 0.2, s1: -55, ks1: 1, fa1: 180, fs1: 0.6, t2: -255, kt2: 1, s2: -57, ks2: 0.65, fa2: -270, fs2: 0.75, u1: -25, f1: -25 },
+        { T: 180, t1: 130, kt1: 1, s1: -25, ks1: 1, fa1: 90, fs1: 1, t2: -230, kt2: 1, s2: -25, ks2: 1, fa2: -270, fs2: 1, u1: -25, f1: -25 },
+        { T: 180, t1: 105, kt1: 1, s1: -58, ks1: 0.65, fa1: 90, fs1: 0.75, t2: -160, kt2: 0.2, s2: -60, ks2: 1, fa2: -180, fs2: 0.6, u1: -25, f1: -25 }],
+      tl: [[0, 0], [0.12, 0], [0.21, 1], [0.3, 2], [0.39, 3], [0.48, 4], [0.62, 4], [0.71, 5], [0.8, 6], [0.89, 7], [0.98, 8], [1, 8]],
       cues: [C(0, 1, 'Sit tall, chest up'), C(0.12, 0.48, 'Knees fall together'), C(0.62, 0.98, 'Knees fall together'), C(0.46, 0.64, 'Both knees at 90°'), C(-0.02, 0.14, 'Both knees at 90°')] },
     couch: { anchor: ['K1', [70, 174]], scene: 'couch', period: 5200, key: 0.62, arcs: [['S', 'H', 'K1']],
       frames: [{ T: 165, t1: -15, s1: 180, fa1: 180, t2: 88, s2: 0, fa2: 90, u1: 36, f1: 36 }, { T: 184, t1: -15, s1: 180, fa1: 180, t2: 88, s2: 0, fa2: 90, u1: 30, f1: 30 }],
@@ -469,7 +482,7 @@
       frames: [X(QUAD, { B: 9, N: 64 }), X(QUAD, { B: -7, N: 140 })], tl: [[0, 0], [0.12, 0], [0.38, 0], [0.5, 1], [0.62, 1], [0.88, 1], [1, 0]],
       cues: [C(0, 0.46, 'Cat \u2014 round up, exhale'), C(0.5, 0.96, 'Cow \u2014 chest forward, inhale'), C(0.3, 0.7, 'Move one segment at a time')] },
     foamroll: { anchor: ['H', [92, 150]], scene: 'roller', roller: [52, 170, 10], period: 5600, key: 0.5, spineOk: () => true, arcs: [],
-      frames: [{ T: -96, ox: -12, ikA1: [152, 176], ikA2: [152, 176], fa1: 90, ru1: 26, rf1: 198, N: -100 }, { T: -96, ox: 12, ikA1: [152, 176], ikA2: [152, 176], fa1: 90, ru1: 26, rf1: 198, N: -100 }], tl: TLHOLD,
+      frames: [{ T: -96, ox: -12, ikA1: [152, 176], ikA2: [152, 176], fa1: 90, ru1: 22, rf1: 164, kf1: 0.8, N: -100 }, { T: -96, ox: 12, ikA1: [152, 176], ikA2: [152, 176], fa1: 90, ru1: 22, rf1: 164, kf1: 0.8, N: -100 }], tl: TLHOLD,
       cues: [C(0, 1, 'Roll slowly, 30\u201360 s per area'), C(0.2, 0.7, 'Pause on tender spots'), C(0.6, 1.05, 'Skip the low back')] },
 
     // ===== FRONT / BACK view rigs =====
@@ -588,7 +601,9 @@
         if (o.T == null) o.T = 180; if (o.B == null) o.B = 0; if (o.t1 == null) o.t1 = 0; if (o.s1 == null) o.s1 = o.t1;
         ['1', '2'].forEach(s => { if (o['ru' + s] != null) o['u' + s] = o.T - 180 + o['ru' + s]; if (o['rf' + s] != null) o['f' + s] = o.T - 180 + o['rf' + s]; });
         if (o.u1 == null) o.u1 = 0; if (o.f1 == null) o.f1 = o.u1;
-        if (o.N == null) o.N = o.T; ['t', 's', 'u', 'f'].forEach(k => { if (o[k + '2'] == null) o[k + '2'] = o[k + '1']; });
+        // far limbs mirror the near ones unless given; v19: the length scale (foreshortening) mirrors too, so a far arm
+        // never pokes out full-length behind a foreshortened near arm
+        if (o.N == null) o.N = o.T; ['t', 's', 'u', 'f'].forEach(k => { if (o[k + '2'] == null) { o[k + '2'] = o[k + '1']; const kk = { t: 'kt', s: 'ks', u: 'ku', f: 'kf' }[k]; if (o[kk + '2'] == null && o[kk + '1'] != null) o[kk + '2'] = o[kk + '1']; } });
         if (o.ru1 != null && o.ru2 == null) { o.u2 = o.u1; o.f2 = o.f1; }
         if (o.fa1 == null) o.fa1 = 90; if (o.fa2 == null) o.fa2 = o.fa1; ['fs1', 'fs2', 'kt1', 'ks1', 'kt2', 'ks2', 'ku1', 'kf1', 'ku2', 'kf2'].forEach(k => { if (o[k] == null) o[k] = 1; });
         if (o.wy1 != null && o.wy2 == null) o.wy2 = o.wy1;
@@ -619,14 +634,21 @@
     const A = J[rig.anchor[0]], off = [rig.anchor[1][0] - A[0] + q.ox, rig.anchor[1][1] - A[1] + q.oy];
     Object.keys(J).forEach(k => { J[k] = add(J[k], off); });
     // IK chains (world coords) — never the anchored chain
+    // v19 anatomical IK: of the two elbow/knee solutions, take the one that bends the way the joint really bends (elbow
+    // flexes toward the front of the upper arm, knee folds back) so no target can produce a backward-bent arm or knee.
     const sg = rig.sg || {};
     [['A1', 'H', 't1', 's1', 'thigh', 'shank', 1], ['A2', 'H', 't2', 's2', 'thigh', 'shank', 1], ['W1', 'S', 'u1', 'f1', 'ua', 'fa', -1], ['W2', 'S', 'u2', 'f2', 'ua', 'fa', -1]].forEach(([j, root, a, b, la, lb, s]) => {
       const tg = targetOf(rig, q, J, j); if (!tg) return;
-      const sd = j[1], ka = q[(a[0] === 't' ? 'kt' : 'ku') + sd], kb = q[(a[0] === 't' ? 'ks' : 'kf') + sd];
-      [q[a], q[b]] = ik2(J[root], tg, LEN[la] * ka, LEN[lb] * kb, sg[j] || s);
+      const sd = j[1], ka = q[(a[0] === 't' ? 'kt' : 'ku') + sd], kb = q[(a[0] === 't' ? 'ks' : 'kf') + sd], pref = sg[j] || s;
+      const s1 = ik2(J[root], tg, LEN[la] * ka, LEN[lb] * kb, pref), s2 = ik2(J[root], tg, LEN[la] * ka, LEN[lb] * kb, -pref);
+      [q[a], q[b]] = natural(j, s1) || !natural(j, s2) ? s1 : s2;
     });
     ['1', '2'].forEach(s => { const y = q['wy' + s]; if (y == null) return; const L = LEN.ua * q['ku' + s] + LEN.fa * q['kf' + s], c = Math.max(-1, Math.min(1, (y - J.S[1]) / L)), a = Math.acos(c) / R * (q['u' + s] < 0 ? -1 : 1); q['u' + s] = q['f' + s] = a; });
-    legs(); feet(); // recomputed from the (already offset) hip, so IK'd legs land in world space
+    legs(); // recomputed from the (already offset) hip, so IK'd legs land in world space
+    // v19 floor contact: a toe can never sink through the floor; the foot pivots up about the ankle until the toe rests on it
+    if (rig.floor !== false) ['1', '2'].forEach(sd => { const A = J['A' + sd], L = 25 * q['fs' + sd], fa = q['fa' + sd], toeY = A[1] + L * Math.cos(fa * R), lim = FLOOR - 1;
+      if (toeY > lim && A[1] < lim) { const c = Math.max(-1, Math.min(1, (lim - A[1]) / L)), sn = Math.sin(fa * R) >= 0 ? 1 : -1; q['fa' + sd] = sn * Math.acos(c) / R; } });
+    feet();
     if (rig.hug) { // arms hang (gravity) but stay close to the legs: swing the hands back if they drift in front of thigh/shin
       const { H, K1, A1, S } = J, arm = LEN.ua + LEN.fa;
       const frontAt = y => { if (y <= H[1]) return H[0] + 9; if (y <= K1[1]) return H[0] + (K1[0] - H[0]) * (y - H[1]) / ((K1[1] - H[1]) || 1) + 8; return K1[0] + (A1[0] - K1[0]) * (y - K1[1]) / ((A1[1] - K1[1]) || 1) + 5; };
@@ -675,12 +697,23 @@
     if (opts.overlay) s += overlay(rig, P, q, ph, opts);
     return s;
   }
+  // v19 rendering helpers: one continuous silhouette per body group (outline pass under a borderless fill pass, so no
+  // seams at the joints), round joint caps, and a soft cylindrical sheen + core shadow on every segment.
+  const solid = (paths, caps, cls) => { const c = caps.map(([p, r]) => `<circle cx="${f1(p[0])}" cy="${f1(p[1])}" r="${f1(r)}"/>`).join(''), d = paths.map(x => `<path d="${x}"/>`).join('');
+    return `<g class="mq-ol${cls === 'far' ? ' far' : ''}">${d}${c}</g><g class="${cls === 'far' ? 'mq-far' : 'mq-fill'}">${c}${d}</g>`; }; // caps under the limb fills: they only round the outer corner of a bent joint
+  const vExt = local => local.reduce((m, [, v]) => [Math.max(m[0], v), Math.min(m[1], v)], [0, 0]);
+  function lens(a, b, L, v0, hw, u0, u1, fr) { // tapered strip along a segment (local u in segment units)
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]), k = Math.max(0.22, len / L), n = 8, top = [], bot = [];
+    for (let i = 0; i <= n; i++) { const u = (u0 + (u1 - u0) * i / n) * k, t = Math.sin(Math.PI * i / n) * 0.85 + 0.15; top.push([u, v0 + hw * t]); bot.push([u, v0 - hw * t]); }
+    return smooth(top.concat(bot.reverse()).map(fr || frame(a, unit(a, b)))); }
+  function sheen(a, b, local, L) { const [vf, vb] = vExt(local), uM = local.reduce((m, [u]) => Math.max(m, u), 0);
+    return `<path class="mq-hl" d="${lens(a, b, L, vf * 0.4, vf * 0.2, uM * 0.1, uM * 0.86, null)}"/><path class="mq-sh" d="${lens(a, b, L, vb * 0.58, -vb * 0.26, uM * 0.08, uM * 0.9, null)}"/>`; }
   function bodySide(rig, P, q, muscles, inten) {
     const sh = figShapes(), mk = sh.mk, off = rig.farOff || [-3.5, -1.2], fz = p => add(p, off), sc = (shape, k) => shape.map(([u, v]) => [u, v * k]);
     const mus = (seg, side, a, b) => muscles.map(m0 => [m0.replace('~', ''), m0.endsWith('~')]).filter(([m]) => MUS[m] && MUS[m][0] === seg && ((rig.mside && rig.mside[m]) || 1) === side).map(([m, sec]) => {
-      const shp = sc(MUS[m][1], mk[seg]), d = seg === 'torso' ? smooth(bend(q.B, shp).map(frame(a, dir(q.T), true))) : limb(a, b, shp, LEN[seg === 'calf' ? 'shank' : seg]);
+      const shp = sc(MUS[m][1], mk[seg] * (sh.build[seg] || 1)), d = seg === 'torso' ? smooth(bend(q.B, shp).map(frame(a, dir(q.T), true))) : limb(a, b, shp, LEN[seg === 'calf' ? 'shank' : seg]);
       return `<path class="mq-mus${sec ? ' sec' : ''}" style="opacity:${((sec ? 0.25 : 0.4) + (sec ? 0.2 : 0.5) * inten).toFixed(2)}" d="${d}"/>`; }).join('');
-    const foot = (a, fa, fs, cls) => { const d = dir(fa), so = [-d[1], d[0]]; return `<path class="${cls}" d="${smooth(sh.foot.map(([u, w]) => add(add(a, d, u * fs), so, w)))}"/>`; };
+    const footD = (a, fa, fs) => { const d = dir(fa), so = [-d[1], d[0]]; return smooth(sh.foot.map(([u, w]) => add(add(a, d, u * fs), so, w))); };
     const pr = rig.prop || 'none';
     const handProp = (E, W, far) => {
       const d = unit(E, W), n = [d[1], -d[0]], cls = far ? 'mq-db far' : 'mq-db';
@@ -694,28 +727,32 @@
       if (pr === 'wheel' && !far) return `<circle class="mq-db" cx="${f1(W[0])}" cy="${f1(W[1] + 3)}" r="7"/><circle class="mq-db-hub" cx="${f1(W[0])}" cy="${f1(W[1] + 3)}" r="2"/>`;
       return '';
     };
+    const TH = sh.thighB, CA = sh.calfB, UA = sh.uaB, FA = sh.faB;
     let s = '';
-    // far side: leg, arm (+ prop)
-    s += `<path class="mq-far" d="${limb(fz(P.H), fz(P.K2), sh.thigh, LEN.thigh)}"/><path class="mq-far" d="${limb(fz(P.K2), fz(P.A2), sh.calf, LEN.shank)}"/>` + foot(fz(P.A2), q.fa2, q.fs2, 'mq-far');
+    // far side: leg + arm as one darker silhouette (+ prop)
+    s += solid([limb(fz(P.H), fz(P.K2), TH, LEN.thigh), limb(fz(P.K2), fz(P.A2), CA, LEN.shank), footD(fz(P.A2), q.fa2, q.fs2)], [[fz(P.K2), 5.4], [fz(P.A2), 3.4]], 'far');
     s += mus('thigh', 2, fz(P.H), fz(P.K2));
-    s += `<path class="mq-far" d="${limb(fz(P.S), fz(P.E2), sh.ua, LEN.ua)}"/><path class="mq-far" d="${limb(fz(P.E2), fz(P.W2), sh.fa, LEN.fa)}"/><circle class="mq-far" cx="${f1(fz(P.W2)[0])}" cy="${f1(fz(P.W2)[1])}" r="3.4"/>` + handProp(fz(P.E2), fz(P.W2), true);
-    // torso
-    s += `<path class="mq-body" d="${smooth(bend(q.B, sh.torso).map(frame(P.H, dir(q.T), true)))}"/>` + mus('torso', 1, P.H);
-    // near leg
-    s += `<path class="mq-body" d="${limb(P.H, P.K1, sh.thigh, LEN.thigh)}"/>` + mus('thigh', 1, P.H, P.K1);
-    s += `<path class="mq-body" d="${limb(P.K1, P.A1, sh.calf, LEN.shank)}"/>` + mus('calf', 1, P.K1, P.A1) + foot(P.A1, q.fa1, q.fs1, 'mq-body');
-    // neck + head + hair
-    const hf = frame(P.S, dir(q.N), true);
-    s += `<path class="mq-body" d="${smooth(sh.neck.map(frame(P.S, dir((q.T + q.N) / 2), true)))}"/><path class="mq-body" d="${smooth(sh.head.map(hf))}"/><path class="mq-hair" d="${smooth(sh.hair.map(hf))}"/>`;
+    s += solid([limb(fz(P.S), fz(P.E2), UA, LEN.ua), limb(fz(P.E2), fz(P.W2), FA, LEN.fa)], [[fz(P.E2), 4.4], [fz(P.W2), 3.4]], 'far') + handProp(fz(P.E2), fz(P.W2), true);
+    // near body: torso + neck + head + near leg as ONE silhouette, then sheen, then muscles
+    const torsoD = smooth(bend(q.B, sh.torsoB).map(frame(P.H, dir(q.T), true))), hf = frame(P.S, dir(q.N), true);
+    const neckD = smooth(sh.neck.map(frame(P.S, dir((q.T + q.N) / 2), true))), headD = smooth(sh.head.map(hf));
+    s += solid([torsoD, limb(P.H, P.K1, TH, LEN.thigh), limb(P.K1, P.A1, CA, LEN.shank), footD(P.A1, q.fa1, q.fs1), neckD, headD], [[P.K1, 5.8], [P.A1, 3.8]], 'near');
+    const tu = dir(q.T), tfr = frame(P.H, tu, true), [tvf, tvb] = vExt(sh.torsoB);
+    s += `<path class="mq-hl" d="${lens(P.H, add(P.H, tu, LEN.torso), 55, tvf * 0.42, tvf * 0.2, 6, 48, tfr)}"/><path class="mq-sh" d="${lens(P.H, add(P.H, tu, LEN.torso), 55, tvb * 0.6, -tvb * 0.24, 4, 50, tfr)}"/>`;
+    s += sheen(P.H, P.K1, TH, LEN.thigh) + sheen(P.K1, P.A1, CA, LEN.shank);
+    s += `<path class="mq-crease" d="${limb(P.H, P.K1, TH, LEN.thigh)}"/>`; // faint hip crease so a raised thigh still reads in front of the belly
+    s += mus('torso', 1, P.H) + mus('thigh', 1, P.H, P.K1) + mus('calf', 1, P.K1, P.A1);
+    s += `<path class="mq-hair" d="${smooth(sh.hair.map(hf))}"/>`;
     // props carried on the body
     const u = dir(q.T), fr = [-u[1], u[0]];
     if (pr === 'db1' && rig.propAt === 'hips') s += hex(add(P.H, fr, 12), 'mq-db');
     if (pr === 'dbfeet') s += hex(add(P.A1, unit(P.K1, P.A1), 3), 'mq-db');
     if (pr === 'kneeband') s += `<circle cx="${f1(P.K1[0])}" cy="${f1(P.K1[1])}" r="6.5" class="band" fill="none"/>`;
-    // near arm + hand + prop
-    s += `<path class="mq-body" d="${limb(P.S, P.E1, sh.ua, LEN.ua)}"/>` + mus('ua', 1, P.S, P.E1) + `<path class="mq-body" d="${limb(P.E1, P.W1, sh.fa, LEN.fa)}"/>` + mus('fa', 1, P.E1, P.W1);
-    const hp = handProp(P.E1, P.W1, false), hand = `<circle class="mq-body" cx="${f1(P.W1[0])}" cy="${f1(P.W1[1])}" r="3.6"/>`;
-    s += pr === 'dbv' ? hp + hand : hand + hp;
+    // near arm: its own silhouette on top (+ hand + prop)
+    const hp = handProp(P.E1, P.W1, false);
+    s += (pr === 'dbv' ? hp : '') + solid([limb(P.S, P.E1, UA, LEN.ua), limb(P.E1, P.W1, FA, LEN.fa)], [[P.E1, 4.8], [P.W1, 3.7]], 'near');
+    s += sheen(P.S, P.E1, UA, LEN.ua) + sheen(P.E1, P.W1, FA, LEN.fa) + mus('ua', 1, P.S, P.E1) + mus('fa', 1, P.E1, P.W1);
+    s += pr === 'dbv' ? '' : hp;
     if (pr === 'bandback') { const b = add(add(P.S, fr, -16), u, -4), w2 = fz(P.W2), c1 = add(b, u, -9), c2 = add(b, u, 9); s += `<path d="M${f1(P.W1[0])},${f1(P.W1[1])} C${f1(c1[0])},${f1(c1[1])} ${f1(c2[0])},${f1(c2[1])} ${f1(w2[0])},${f1(w2[1])}" class="band" fill="none"/>`; }
     if (pr === 'bar' && rig.propAt) { const c = rig.propAt === 'back' ? add(add(P.S, fr, -9), u, -1) : rig.propAt === 'front' ? add(add(P.S, fr, 11), u, 2) : add(P.H, fr, 13); s += plate(c, rig.plate || 13); }
     if (pr === 'rope') { const ph = 2 * Math.PI * ((q._c || 0) - 0.5), Rr = 128, a1 = add(P.W1, [Math.sin(ph - 0.5) * Rr, Math.cos(ph - 0.5) * Rr]), a2 = add(P.W1, [Math.sin(ph + 0.5) * Rr, Math.cos(ph + 0.5) * Rr]);
@@ -737,31 +774,87 @@
     const limbMus = (seg, a, b, side) => ML.filter(([m]) => MM[m] && MM[m][0] === seg).map(([m, sec]) => `<path class="mq-mus${sec ? ' sec' : ''}" ${sec ? op2 : op} d="${limb(a, b, MM[m][1], LEN[seg === 'calf' ? 'shank' : seg], outward(a, b, side))}"/>`).join('');
     const tf = frame(P.P, d, true), kT = q.kT;
     const torsoMus = ML.filter(([m]) => MM[m] && MM[m][0] === 'torso').map(([m, sec]) => { const h = MM[m][1]; return [1, -1].map(sg => `<path class="mq-mus${sec ? ' sec' : ''}" ${sec ? op2 : op} d="${smooth(h.map(([u, v]) => tf([u * kT, v * sg])))}"/>`).join(''); }).join('');
-    const foot = (K, A) => { const u = unit(K, A), n = [u[1], -u[0]]; return `<path class="mq-body" d="${smooth([[-2, -5], [5, -6], [9, -3], [9, 3], [5, 6], [-2, 5]].map(([a, b]) => add(add(A, u, a), n, b)))}"/>`; };
-    const leg = s => `<path class="mq-body" d="${limb(P['H' + s], P['K' + s], F.thigh, LEN.thigh, outward(P['H' + s], P['K' + s], s))}"/>` + limbMus('thigh', P['H' + s], P['K' + s], s) +
-      `<path class="mq-body" d="${limb(P['K' + s], P['A' + s], F.calf, LEN.shank, outward(P['K' + s], P['A' + s], s))}"/>` + limbMus('calf', P['K' + s], P['A' + s], s) + foot(P['K' + s], P['A' + s]);
+    const footD = (K, A) => { const u = unit(K, A), n = [u[1], -u[0]]; return smooth([[-2, -5], [5, -6], [9, -3], [9, 3], [5, 6], [-2, 5]].map(([a, b]) => add(add(A, u, a), n, b))); };
+    // v19: legs / torso / head / arms are drawn as continuous silhouettes (see solid()) with joint caps + sheen
+    const legParts = sd => [limb(P['H' + sd], P['K' + sd], F.thigh, LEN.thigh, outward(P['H' + sd], P['K' + sd], sd)), limb(P['K' + sd], P['A' + sd], F.calf, LEN.shank, outward(P['K' + sd], P['A' + sd], sd)), footD(P['K' + sd], P['A' + sd])];
+    const legCaps = sd => [[P['K' + sd], 5.6], [P['A' + sd], 3.8]];
+    const legTop = sd => limbMus('thigh', P['H' + sd], P['K' + sd], sd) + limbMus('calf', P['K' + sd], P['A' + sd], sd);
     const pr = rig.prop || 'none';
-    const arm = s => { const S = P['S' + s], E = P['E' + s], W = P['W' + s];
-      let o = `<path class="mq-body" d="${limb(S, E, F.ua, LEN.ua, outward(S, E, s))}"/>` + limbMus('ua', S, E, s) + `<path class="mq-body" d="${limb(E, W, F.fa, LEN.fa, outward(E, W, s))}"/>` + limbMus('fa', E, W, s);
-      o += `<circle class="mq-body" cx="${f1(W[0])}" cy="${f1(W[1])}" r="3.8"/>`;
+    const armParts = sd => [limb(P['S' + sd], P['E' + sd], F.ua, LEN.ua, outward(P['S' + sd], P['E' + sd], sd)), limb(P['E' + sd], P['W' + sd], F.fa, LEN.fa, outward(P['E' + sd], P['W' + sd], sd))];
+    const armCaps = sd => [[P['E' + sd], 4.8], [P['W' + sd], 3.9]];
+    const armPre = sd => { if (pr !== 'pads') return ''; const E = P['E' + sd], u = unit(E, P['W' + sd]), n = [u[1], -u[0]], a = add(add(E, n, sd === 'L' ? -7 : 7), u, -2), b = add(a, u, 30); return seg(a, b, 7, 'mq-pad'); };
+    const armTop = sd => { const S = P['S' + sd], E = P['E' + sd], W = P['W' + sd]; let o = limbMus('ua', S, E, sd) + limbMus('fa', E, W, sd);
       if (pr === 'db2') o += hex(add(W, unit(E, W), 2), 'mq-db');
       if (pr === 'handle') o += `<circle class="mq-db" cx="${f1(W[0])}" cy="${f1(W[1])}" r="3"/>`;
-      if (pr === 'pads') { const u = unit(E, W), n = [u[1], -u[0]], a = add(add(E, n, s === 'L' ? -7 : 7), u, -2), b = add(a, u, 30); o = seg(a, b, 7, 'mq-pad') + o; }
       return o; };
-    const head = () => { const up = dir(q.N), rt = [-up[1], up[0]], hp = pts => smooth(pts.map(([x, y]) => add(add(P.Hd, rt, x), up, y)));
-      const nk = F.neck, base = P.N0;
-      let o = `<path class="mq-body" d="${smooth([[-nk, -2], [nk, -2], [nk * 0.9, 9], [-nk * 0.9, 9]].map(([x, y]) => add(add(base, rt, x), up, y)))}"/>`;
-      if (FIG === 'female' && back) o += `<path class="mq-hair" d="${hp(PONY.map(([x, y]) => [x, y - 4]))}"/>`;
-      o += `<path class="mq-body" d="${ellipse(P.Hd, F.head[0], F.head[1], q.N)}"/>`;
-      o += back ? `<path class="mq-hair" d="${ellipse(add(P.Hd, up, 1.5), F.head[0] + 0.8, F.head[1] + (FIG === 'female' ? 0.6 : -0.6), q.N)}"/>` : `<path class="mq-hair" d="${hp(FRONT_HAIR[FIG] || FRONT_HAIR.male)}"/>`;
-      return o; };
-    let s = rig.legsFront ? '' : leg('L') + leg('R');
-    if (rig.armsBehind) s += arm('L') + arm('R');
-    s += `<path class="mq-body" d="${smooth(mirror(F.torso).map(([u, v]) => tf([u * kT, v])))}"/>` + torsoMus;
-    s += head();
-    if (rig.legsFront) s += leg('L') + leg('R');
-    if (!rig.armsBehind) s += arm('L') + arm('R');
+    const up = dir(q.N), rt = [-up[1], up[0]], hp = pts => smooth(pts.map(([x, y]) => add(add(P.Hd, rt, x), up, y))), nk = F.neck;
+    const neckD = smooth([[-nk, -2], [nk, -2], [nk * 0.9, 9], [-nk * 0.9, 9]].map(([x, y]) => add(add(P.N0, rt, x), up, y))), headD = ellipse(P.Hd, F.head[0], F.head[1], q.N);
+    const torsoD = smooth(mirror(F.torso).map(([u, v]) => tf([u * kT, v])));
+    const hair = (FIG === 'female' && back ? `<path class="mq-hair" d="${hp(PONY.map(([x, y]) => [x, y - 4]))}"/>` : '') +
+      (back ? `<path class="mq-hair" d="${ellipse(add(P.Hd, up, 1.5), F.head[0] + 0.8, F.head[1] + (FIG === 'female' ? 0.6 : -0.6), q.N)}"/>` : `<path class="mq-hair" d="${hp(FRONT_HAIR[FIG] || FRONT_HAIR.male)}"/>`);
+    // each leg / arm is its own silhouette so the inner contours (between the legs, arm against the torso) stay readable
+    const arms = () => armPre('L') + armPre('R') + solid(armParts('L'), armCaps('L'), 'near') + armTop('L') + solid(armParts('R'), armCaps('R'), 'near') + armTop('R');
+    const legs = () => solid(legParts('L'), legCaps('L'), 'near') + legTop('L') + solid(legParts('R'), legCaps('R'), 'near') + legTop('R');
+    const core = () => solid([torsoD, neckD, headD], [], 'near') + torsoMus + hair;
+    let s = rig.armsBehind ? arms() : '';
+    s += rig.legsFront ? core() + legs() : legs() + core();
+    if (!rig.armsBehind) s += arms();
     return s;
+  }
+
+  // ---------- coach-mode pin layout (pure geometry, unit-tested by tools/check_demos.js) ----------
+  const PIN = { row: 14, gap: 4, h: 11, badge: 3.4 }; // normalized units (vb width 230); scaled by K = vb width / 230
+  const chipW = text => text.length * 3.45 + 19;
+  // pack chips (already in display order) into rows no wider than the strip -> [{ i, row, x }] normalized
+  function packChips(texts, width = 222) {
+    const out = []; let row = 0, x = 0;
+    texts.forEach((t, i) => { const w = chipW(t); if (x > 0 && x + w > width) { row++; x = 0; } out.push({ i, row, x, w }); x += w + PIN.gap; });
+    return out;
+  }
+  const pinRows = texts => (texts.length ? packChips(texts).reduce((m, c) => Math.max(m, c.row + 1), 0) : 0);
+  const pinStripH = texts => (texts.length ? pinRows(texts) * PIN.row + 6 : 0);
+  const segX = (a, b, c, d) => { // proper segment intersection
+    const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+    return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0; };
+  const segHitsRect = (a, b, r) => { const [x, y, w, h] = r, c = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+    return c.some((p, i) => segX(a, b, p, c[(i + 1) % 4])); };
+  // -> { chips: [{ text, n, rect:[x,y,w,h], target, badge }], leaders: bool }
+  function layoutPins(pins, P, vb, K) {
+    const pts = pins.map(pn => pn.at(P)).map(p => (p ? [p[0], p[1]] : null));
+    const items = pins.map((pn, k) => ({ text: pn.text, target: pts[k] })).filter(it => it.target).sort((a, b) => a.target[0] - b.target[0]);
+    // badges: nudge apart any two body points closer than ~2 badge widths
+    items.forEach((it, k) => { it.n = k + 1; it.badge = it.target.slice(); for (let j = 0; j < k; j++) { const o = items[j].badge, d = Math.hypot(it.badge[0] - o[0], it.badge[1] - o[1]), min = PIN.badge * 2.3 * K;
+      if (d < min) { const u = d > 0.01 ? [(it.badge[0] - o[0]) / d, (it.badge[1] - o[1]) / d] : [0.8, -0.6]; it.badge = add(o, u, min); } } });
+    const packed = packChips(items.map(it => it.text)), rows = packed.reduce((m, c) => Math.max(m, c.row + 1), 0);
+    const top = vb[1] + vb[3] - (rows * PIN.row + 3) * K, left = vb[0] + 4 * K;
+    // centre each row in the strip
+    const rowW = r => packed.filter(c => c.row === r).reduce((m, c) => Math.max(m, c.x + c.w), 0), span = vb[2] / K - 8;
+    items.forEach((it, k) => { const c = packed[k], off = Math.max(0, (span - rowW(c.row)) / 2); it.rect = [left + (c.x + off) * K, top + c.row * PIN.row * K, c.w * K, PIN.h * K]; });
+    let leaders = true; // any row count, as long as the geometry checks below pass
+    const from = it => [it.rect[0] + it.rect[2] / 2, it.rect[1]];
+    for (let a = 0; leaders && a < items.length; a++) for (let b = 0; b < items.length; b++) {
+      if (a === b) continue;
+      if (b > a && segX(from(items[a]), items[a].badge, from(items[b]), items[b].badge)) leaders = false;
+      if (segHitsRect(from(items[a]), items[a].badge, items[b].rect)) leaders = false;
+    }
+    return { chips: items, leaders };
+  }
+  // leader lines vs numbered legend is decided ONCE per rig + viewBox over the whole cycle, so it never flickers mid-rep
+  function pinMode(rig, pins, vb, K) {
+    const key = vb.join(' '); if (rig._pinMode && rig._pinMode.key === key) return rig._pinMode.leaders;
+    let ok = true; for (let i = 0; ok && i < 16; i++) ok = layoutPins(pins, poseAny(rig, phase(rig, i / 16).q), vb, K).leaders;
+    rig._pinMode = { key, leaders: ok }; return ok;
+  }
+  function pinsSvg(rig, pins, P, vb, K) {
+    const L = layoutPins(pins, P, vb, K), b = PIN.badge * K; L.leaders = L.leaders && pinMode(rig, pins, vb, K);
+    let s = `<g class="mq-pins${L.leaders ? '' : ' legend'}">`;
+    if (L.leaders) L.chips.forEach(it => { s += `<line class="mq-pin-l" x1="${f1(it.rect[0] + it.rect[2] / 2)}" y1="${f1(it.rect[1])}" x2="${f1(it.badge[0])}" y2="${f1(it.badge[1])}"/>`; });
+    L.chips.forEach(it => { const [x, y, w, h] = it.rect;
+      s += `<g class="mq-pin"><rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" rx="${f1(h / 2)}"/><circle class="mq-pin-n" cx="${f1(x + h / 2)}" cy="${f1(y + h / 2)}" r="${f1(h / 2 - 1.2 * K)}"/>` +
+        `<text class="mq-pin-nt" x="${f1(x + h / 2)}" y="${f1(y + h / 2 + 2.2 * K)}" text-anchor="middle" style="font-size:${f1(6 * K)}px">${it.n}</text>` +
+        `<text x="${f1(x + h + 2.5 * K)}" y="${f1(y + 7.7 * K)}" style="font-size:${f1(6.4 * K)}px">${it.text}</text></g>`; });
+    L.chips.forEach(it => { s += `<g class="mq-pin-b"><circle cx="${f1(it.badge[0])}" cy="${f1(it.badge[1])}" r="${f1(b)}"/><text x="${f1(it.badge[0])}" y="${f1(it.badge[1] + 2.1 * K)}" text-anchor="middle" style="font-size:${f1(5.6 * K)}px">${it.n}</text></g>`; });
+    return s + '</g>';
   }
 
   // ---------- overlay: spine guide, joint angles, phased cues ----------
@@ -775,13 +868,12 @@
     });
     const vb = opts.vb || [-4, 10, 230, 172.5], K = Math.max(1, vb[2] / 230), right = vb[0] + vb[2] - 5 * K; let y = vb[1] + 5 * K;
     if (opts.noCues) return s;
-    // Coach mode: 2-3 posture cues pinned to the body part they're about (leader line follows the joint)
+    // Coach mode (v19 layout): 2-3 posture cues become numbered chips in a strip reserved BELOW the figure (fitBox makes
+    // room), so a label never covers the body or another label. Each body point gets a matching numbered badge. Thin
+    // leader lines are drawn only when the layout is provably clean (one row, no two leaders cross, no leader passes
+    // through another chip); otherwise the strip works as a legend (badge 1 on the body = chip 1).
     const pins = opts.pins ? pinsFor(rig) : [];
-    pins.forEach((pn, i) => {
-      const J = pn.at(P); if (!J) return;
-      const w = (pn.text.length * 3.6 + 10) * K, h = 11 * K, x = vb[0] + 3 * K, py = vb[1] + vb[3] - (pins.length - i) * 14 * K - 4 * K;
-      s += `<g class="mq-pin"><line x1="${f1(x + w)}" y1="${f1(py + h / 2)}" x2="${f1(J[0])}" y2="${f1(J[1])}"/><circle cx="${f1(J[0])}" cy="${f1(J[1])}" r="${f1(2.2 * K)}"/><rect x="${f1(x)}" y="${f1(py)}" width="${f1(w)}" height="${f1(h)}" rx="${f1(5.5 * K)}"/><text x="${f1(x + w / 2)}" y="${f1(py + 7.8 * K)}" text-anchor="middle" style="font-size:${f1(6.4 * K)}px">${pn.text}</text></g>`;
-    });
+    if (pins.length) s += pinsSvg(rig, pins, P, vb, K);
     const pinned = new Set(pins.map(p => p.text));
     rig.cues.forEach(cu => {
       if (pinned.has(cu.text)) return;
@@ -797,7 +889,7 @@
 
   // ---------- coach mode: pinned cues + common mistake ----------
   const mid = (a, b) => (a && b ? [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] : null);
-  const PIN_SIDE = [[/back|spine|torso|chest|ribs|plank|straight line|body straight|square|tall|posture|lean/i, P => mid(P.H, P.S)], [/hip|glute|pelvis|seat/i, P => P.H], [/knee|legs? /i, P => P.K1],
+  const PIN_SIDE = [[/upper back|shoulder blade|blades/i, P => add(P.S, unit(P.S, P.H), 7)], [/back|spine|torso|chest|ribs|plank|straight line|body straight|square|tall|posture|lean/i, P => mid(P.H, P.S)], [/hip|glute|pelvis|seat/i, P => P.H], [/knee|legs? /i, P => P.K1],
     [/quad|thigh|hamstring/i, P => mid(P.H, P.K1)], [/calf|heel|foot|feet|toe|mid-foot|shin|step/i, P => P.A1], [/elbow|upper arm|biceps|triceps|arms? /i, P => P.E1], [/shoulder|blade|lats|delt|shrug/i, P => P.S],
     [/wrist|grip|bar|handle|weight|hand|dumbbell|band|rope|cable|palm|thumb|ball/i, P => P.W1], [/head|chin|neck|gaze|forehead|ears/i, P => P.Hd]];
   const PIN_FRONT = [[/back|spine|torso|chest|ribs|lean|tall/i, P => mid(P.P, P.N0)], [/hip|glute|pelvis/i, P => P.HL], [/knee/i, P => P.KL], [/heel|foot|feet|toe/i, P => P.AL],
@@ -830,7 +922,7 @@
   }
 
   // fit the viewBox to the whole movement (+ scenery), 4:3 for the sheet, square for thumbnails
-  function fitBox(rig, small) {
+  function fitBox(rig, small, pins) {
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; const addPt = (p, r = 0) => { if (!p) return; x0 = Math.min(x0, p[0] - r); y0 = Math.min(y0, p[1] - r); x1 = Math.max(x1, p[0] + r); y1 = Math.max(y1, p[1] + r); };
     for (let i = 0; i < 24; i++) { const P = poseAny(rig, phase(rig, i / 24).q);
       Object.keys(P).forEach(k => { if (Array.isArray(P[k]) && k !== 'Hd') addPt(P[k], 11); }); addPt(P.Hd, 15);
@@ -841,6 +933,9 @@
     const pad = small ? 4 : 8; x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
     let w = x1 - x0, h = y1 - y0; const AR = small ? 1 : 4 / 3;
     if (!small && w < 230) { x0 -= (230 - w) / 2; w = 230; }
+    // coach mode: reserve a chip strip under the figure (normalized height scales with the final width, so solve for it)
+    const strip = pins && pins.length ? pinStripH(pins.map(p => p.text)) : 0;
+    if (strip) { let extra = strip; for (let i = 0; i < 6; i++) { const fw = Math.max(w, (h + extra) * AR); extra = strip * Math.max(1, fw / 230); } h += extra; y1 = y0 + h; }
     if (w / h < AR) { const nw = h * AR; x0 -= (nw - w) / 2; w = nw; } else { const nh = w / AR; y0 -= (nh - h); h = nh; }
     return [x0, y0, w, h].map(v => Math.round(v * 10) / 10);
   }
@@ -853,7 +948,7 @@
       const dt = d.last == null ? 0 : ts - d.last; d.last = ts; if (d.paused) return; draw(d, (d.c || 0) + dt * (d.speed || 1) / d.rig.period); });
     raf = live.size ? requestAnimationFrame(loop) : null;
   }
-  const DEFS = '<defs><linearGradient id="mqShade" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--mq-hi)"/><stop offset="1" style="stop-color:var(--mq-lo)"/></linearGradient></defs>';
+  const DEFS = '<defs><linearGradient id="mqShade" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--mq-hi)"/><stop offset="1" style="stop-color:var(--mq-lo)"/></linearGradient><linearGradient id="mqFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--mq-hi)"/><stop offset="1" style="stop-color:var(--mq-mid)"/></linearGradient></defs>';
   const rigFor = ex => { const k = ex && EX_RIG[ex.id]; return k && RIGS[k] ? normalize(RIGS[k]) : null; };
   const GENERIC = { stand: 'bwsquat' };
   function mount(container, ex, mo) {
@@ -861,7 +956,7 @@
     mo = mo || {};
     let rig = rigFor(ex) || normalize(RIGS[GENERIC.stand]);
     if (rig.view && mo.view && mo.view !== rig.view) rig = Object.assign({}, rig, { view: mo.view }); // front <-> back: same pose, other side of the body
-    const small = container.classList.contains('ex-thumb'), vb = fitBox(rig, small);
+    const small = container.classList.contains('ex-thumb'), vb = fitBox(rig, small, mo.coach && !small ? pinsFor(rig) : null);
     if (!rigFor(ex) && window.console) console.warn('[mannequin] no rig for', ex.id, '- using generic pose');
     container.innerHTML = `<svg viewBox="${vb.join(' ')}" class="demo-svg mq mq-${FIG}" role="img" aria-label="Posture demo of ${String(ex.name).replace(/"/g, '')} (${FIG} figure)">${DEFS}<g></g></svg>`;
     const g = container.querySelector('g'), still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -892,7 +987,7 @@
     return FIG;
   }
   const API = { RIGS, EX_RIG, render, fitBox, DEFS, normalize, rigFor, setFigure, getFigure: () => FIG, freeze: null,
-    hasRig: ex => !!rigFor(ex), phase, pose: poseAny, mistakeFor, staticSvg, control, pinsFor };
+    hasRig: ex => !!rigFor(ex), phase, pose: poseAny, mistakeFor, staticSvg, control, pinsFor, layoutPins, pinStripH, pinMode };
   API.render = (rig, t, opts) => render(normalize(rig), t, opts);
   WO.mountDemo = mount; // every exercise renders a mannequin; the stick-figure path (demo.js) is no longer used
   WO.setFigure = setFigure; WO.getFigure = () => FIG;

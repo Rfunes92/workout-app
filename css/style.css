@@ -353,6 +353,12 @@ html[data-theme="light"]{--mq-hi:#d9dfe7;--mq-lo:#8e9aab;--mq-far:#c4cbd5;--mq-l
 .mq .mq-body{fill:url(#mqShade);stroke:var(--mq-line);stroke-width:.7;stroke-linejoin:round}
 .mq .mq-far{fill:var(--mq-far);stroke:var(--mq-line);stroke-width:.6;stroke-linejoin:round}
 .mq .mq-mus{fill:var(--accent);stroke:none;mix-blend-mode:normal}
+/* v19: continuous silhouettes (outline pass + borderless fill), joint caps, cylindrical sheen */
+:root{--mq-mid:#d5dbe3;--mq-hl-o:.28;--mq-sh-o:.13}html[data-theme="light"]{--mq-mid:#c9d0da;--mq-hl-o:.5;--mq-sh-o:.1}
+.mq .mq-ol{fill:var(--mq-line);stroke:var(--mq-line);stroke-width:1.5;stroke-linejoin:round}.mq .mq-ol.far{stroke-width:1.2}
+.mq .mq-fill{fill:url(#mqFill);stroke:none}.mq g.mq-far{stroke:none}
+.mq .mq-hl{fill:#fff;opacity:var(--mq-hl-o)}.mq .mq-sh{fill:#0b1220;opacity:var(--mq-sh-o)}
+.mq .mq-crease{fill:none;stroke:var(--mq-line);stroke-width:.5;opacity:.3}
 .mq .mq-db{fill:var(--mq-db);stroke:var(--mq-line);stroke-width:.6}.mq .mq-db.far{opacity:.75}.mq .mq-db-hub{fill:var(--mq-hub)}
 .mq .mq-spine{stroke:var(--mq-guide);stroke-width:1.3;stroke-dasharray:3 2.4;stroke-linecap:round}.mq .mq-spine.ok{stroke:var(--good)}
 .mq .mq-arc{fill:none;stroke:var(--accent2);stroke-width:1.2}.mq .mq-deg{font:700 6px system-ui,sans-serif;fill:var(--accent2)}
@@ -491,8 +497,11 @@ html.in-session .restbar{bottom:calc(14px + var(--safe-b))}
 .coach-legend{display:flex;gap:12px;flex-wrap:wrap;margin:0 2px 8px}
 .coach-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .coach-legend .lg-pin{background:var(--blue);border-radius:50%}.coach-legend .lg-spine{background:var(--good);height:3px}
-.mq .mq-pin line{stroke:var(--blue);stroke-width:.8}.mq .mq-pin circle{fill:var(--blue)}
-.mq .mq-pin rect{fill:var(--bg2);stroke:var(--blue);stroke-width:.8;opacity:.94}.mq .mq-pin text{font:700 6.4px system-ui,sans-serif;fill:var(--text)}
+/* v19 coach pins: numbered chips in a strip under the figure + matching numbered badges on the body */
+.mq .mq-pin-l{stroke:var(--blue);stroke-width:.7;opacity:.75;stroke-dasharray:2 1.6}
+.mq .mq-pin rect{fill:var(--bg2);stroke:var(--blue);stroke-width:.7;opacity:.96}.mq .mq-pin text{font:700 6.4px system-ui,sans-serif;fill:var(--text)}
+.mq .mq-pin .mq-pin-n{fill:var(--blue)}.mq .mq-pin .mq-pin-nt,.mq .mq-pin-b text{font:800 6px system-ui,sans-serif;fill:#fff}
+.mq .mq-pin-b circle{fill:var(--blue);stroke:var(--bg2);stroke-width:.9}
 .mq .mq-spine.bad{stroke:var(--danger-ink);stroke-dasharray:none;stroke-width:1.6}
 .mistake{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .mistake figure{margin:0;border-radius:14px;border:1px solid var(--line);background:radial-gradient(circle at 50% 40%,var(--demo-bg1),var(--demo-bg2));overflow:hidden}
@@ -516,3 +525,8 @@ html.in-session .restbar{bottom:calc(14px + var(--safe-b))}
 .ch-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}.ch-legend i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:4px;vertical-align:3px}
 .ch-legend i.ch-s0{background:var(--accent)}.ch-legend i.ch-s1{background:var(--blue)}.ch-legend i.ch-s2{background:var(--accent2)}
 .goal-chart .empty{padding:16px 6px}
+/* v19: warm-up swap + "Today only" location override */
+.wu-row .wu-swap{flex:0 0 auto;padding:6px 10px}
+.today-loc{margin-top:12px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.today-loc .seg{flex:1 1 220px}.today-loc .seg button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.today-loc>.small{flex-basis:100%}
