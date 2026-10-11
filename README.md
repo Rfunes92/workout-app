@@ -135,3 +135,11 @@ At ≥900px wide, `#admin` uses a sidebar + wide content layout (user table, 3-c
 - **No-clutter promise** (`js/flags.js` `POLICY`): no ads, at most one upsell per screen, nothing interrupts a session. New UX features are `ux` flags; Settings → Interface → Classic turns them all off.
 - **Goal types**: strength / muscle / lose fat / feel better. Goal weight is only required for lose fat, and the week chart changes to match.
 - **Sync & data**: a "✓ Saved" tick, flush on hide/pagehide, a history-merging cloud merge, and CSV export. CSV import accepts Hevy, Strong, or Mount Up exports; unknown exercises are kept as history.
+
+## Admin → pause / delete accounts (v22)
+`users/{uid}.status` = `active` (or missing) | `paused` | `deleted`. Admin → Users cards (and the user detail page) have **Pause / Reinstate / Delete**; Ronnie's own admin account shows "You · admin" with no actions (blocked in code *and* in the rules).
+- **Pause**: sets `status: 'paused'`. The person's app locks live on every device ("Account paused" screen with Check again / Sign out); their data is kept. **Reinstate** sets it back to `active` and their app reloads unlocked.
+- **Delete** (type DELETE to confirm): sets `deleted`, wipes `users/{uid}/data/*` + `foodDays/*`, then replaces the profile with a bare tombstone `{ email, status: 'deleted', deletedAt }` (coach answers gone). Hidden from the list (toggle "Show N deleted"). "Allow back" on a tombstone sets it active again (fresh, empty account).
+- **Firebase Auth login is NOT deleted** (that needs the Admin SDK). Remove it in Firebase console → Authentication → Users (or add a Cloud Function later). Until then the tombstone keeps them locked out of all app data.
+- Enforced by `firestore.rules`: paused/deleted users can read only their own profile doc; no read/write of synced data, no profile edits, can't delete/recreate the profile, can't change `status`. Only the admin can set status, never on the admin's own uid/email. **Publish the rules in the Firebase console** (Firestore → Rules) or Pause/Delete get "Permission denied".
+- Rules tests: `tools/rules_test.mjs` (Firestore emulator, 34 cases). Screenshots: `node tools/admin_status_shots.mjs http://localhost:8000 screenshots/admin-v22 1280 800 desktop-` → `screenshots/admin-v22/`.

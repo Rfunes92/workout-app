@@ -715,3 +715,33 @@ html.in-session .restbar{bottom:calc(14px + var(--safe-b))}
 @media (min-width:1600px){
   html:not([data-mu-vp]) .ex-list{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* ---------- v22 account status: Admin pause / reinstate / delete ---------- */
+.block-screen{z-index:75}
+html.acct-blocked .block-screen{display:block}
+html.acct-blocked body{overflow:hidden}
+html.acct-blocked .topbar,html.acct-blocked #view,html.acct-blocked .tabbar,html.acct-blocked .restbar,html.acct-blocked .auth:not(.block-screen){visibility:hidden}
+.block-icon{font-size:44px;text-align:center;margin:6px 0 2px}
+.block-screen .note{text-align:center;margin:0 0 16px}
+.block-acts{display:flex;flex-direction:column;gap:10px}
+.st-pill{margin-left:6px;vertical-align:2px}
+.admin-urow{flex-wrap:wrap;cursor:pointer}
+.admin-urow>.grow{min-width:0}
+.admin-uacts{display:flex;flex-wrap:wrap;gap:6px;flex-basis:100%;justify-content:flex-end;align-items:center}
+.admin-urow.st-paused{box-shadow:inset 3px 0 0 var(--danger-ink);padding-left:10px}
+.admin-stats:has(.stat:nth-child(4)){grid-template-columns:repeat(4,minmax(0,1fr))}
+.admin-stats:has(.stat:nth-child(4)) .stat small{font-size:10px}
+.admin-urow.st-paused .admin-av{background:var(--danger-bg);color:var(--danger-ink)}
+.admin-urow.st-deleted{opacity:.6}
+.admin-dhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:6px}
+.admin-dhead .admin-uacts{flex-basis:auto}
+.admin-delnote{margin-top:12px}
+@media (min-width:900px){ .admin-urow .admin-uacts{grid-column:1/-1} }
+@media (min-width:768px){
+  html:not([data-mu-vp]) .admin-urow{grid-template-areas:"av main" "av goals" "av act" "av acts"}
+  html:not([data-mu-vp]) .admin-urow .admin-uacts{grid-area:acts;grid-column:auto;justify-content:flex-start;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+  html:not([data-mu-vp]) .admin-stats:has(.stat:nth-child(4)){grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  html:not([data-mu-vp]) .admin-stats:has(.stat:nth-child(4)) .stat small{font-size:inherit}
+  html:not([data-mu-vp]) .admin-urow.st-paused{box-shadow:none;padding-left:18px;border-color:var(--danger-b);background:linear-gradient(180deg,var(--danger-bg),var(--card) 55%)}
+  html:not([data-mu-vp]) .admin-urow.st-paused .admin-uact::before{color:var(--danger-ink)}
+}

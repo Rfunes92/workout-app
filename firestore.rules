@@ -1,11 +1,23 @@
 rules_version = '2';
+// v22: account status. users/{uid}.status = 'active' (or missing) | 'paused' | 'deleted'.
+//   paused/deleted accounts can still read their own profile doc (so the app can show "Account paused"), but can't read or
+//   write any synced app data (users/{uid}/data/**, users/{uid}/foodDays/**) and can't edit/delete their profile doc.
+//   Only the admin can change status, never on the admin's own account. PUBLISH in Firebase console → Firestore → Rules.
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    // Admin: read-only on user data, write on config/features. Ronnie's verified Google email. Optionally pin to his uid: request.auth.uid == '<RONNIE_UID>'
+    function adminEmail() { return 'ronniefunes92@gmail.com'; }
+    // Admin: Ronnie's verified Google email. Optionally pin to his uid: request.auth.uid == '<RONNIE_UID>'
     function isAdmin() {
-      return signedIn() && request.auth.token.email == 'ronniefunes92@gmail.com' && request.auth.token.email_verified == true;
+      return signedIn() && request.auth.token.email == adminEmail() && request.auth.token.email_verified == true;
     }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function statusOf(uid) {
+      let p = /databases/$(database)/documents/users/$(uid);
+      return exists(p) ? get(p).data.get('status', 'active') : 'active';
+    }
+    function statusKeys() { return ['status', 'statusAt', 'statusBy', 'deletedAt']; }
+    function validStatus() { return request.resource.data.get('status', 'active') in ['active', 'paused', 'deleted']; }
     // App-wide feature flags: anyone signed in can read; only the admin can write (Admin → Feature flags).
     match /config/features {
       allow read: if signedIn();
@@ -16,11 +28,25 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
     match /users/{uid} {
-      allow read, write: if signedIn() && request.auth.uid == uid;   // profile doc
-      allow read: if isAdmin();
-      match /{document=**} {
-        allow read, write: if signedIn() && request.auth.uid == uid; // synced data
+      // profile doc
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && !request.resource.data.keys().hasAny(statusKeys());
+      allow update: if isOwner(uid) && resource.data.get('status', 'active') == 'active'
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(statusKeys());
+      allow delete: if isOwner(uid) && resource.data.get('status', 'active') == 'active';
+      // Admin → Users: Pause / Reinstate / Delete (tombstone). Never on the admin's own account.
+      allow create: if isAdmin() && uid != request.auth.uid && validStatus()
+                    && request.resource.data.get('email', '').lower() != adminEmail();
+      allow update: if isAdmin() && uid != request.auth.uid && validStatus()
+                    && resource.data.get('email', '').lower() != adminEmail();
+      // {sub}/ forces at least one segment: in rules v2 a bare {document=**} also matches users/{uid} itself, which would let
+      // these rules bypass the profile-doc status lock above.
+      match /{sub}/{document=**} {
+        // synced data: owner only, and only while the account is active
+        allow read, write: if isOwner(uid) && statusOf(uid) == 'active';
+        // admin: read for the user detail page, delete for Admin → Delete account (wipes workout/food data)
         allow read: if isAdmin();
+        allow delete: if isAdmin() && uid != request.auth.uid;
       }
     }
   }

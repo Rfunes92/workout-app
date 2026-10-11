@@ -237,6 +237,7 @@ WO.onLocalSave = () => { if (!curUid) return; scanQueued = true; clearTimeout(sc
 async function startSync(user) {
   curUid = user.uid; curUser = user; loadMeta(curUid); setStatus(); renderAccount();
   try { await fs(); } catch (e) { lastErr = e; setStatus(); return; }
+  watchStatus(user);
   touchProfile(user);
   watchFlags();
   if (isAdmin(user) && location.hash.startsWith('#admin')) window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -377,6 +378,11 @@ async function firstSignIn(user) {
   // Returning to this device with the same account: its data is still here (namespaced); LWW sync reconciles.
   if (readJSON(metaKey(uid))) return finish(uid);
   await fs();
+  if (!isAdmin(user)) {
+    let st = 'active';
+    try { const p = await FS.getDocFromServer(FS.doc(db, 'users', uid)); st = (p.exists() && p.get('status')) || 'active'; } catch (e) { /* offline: the data read below fails the same way */ }
+    if (st === 'paused' || st === 'deleted') { const err = new Error(blockedText(st)); err.code = 'account-' + st; throw err; }
+  }
   let snaps;
   try { snaps = await Promise.all([FS.getDocsFromServer(userCol(uid, 'data')), FS.getDocsFromServer(userCol(uid, 'foodDays'))]); }
   catch (e) { const err = new Error('Couldn\'t reach your cloud data (' + (e.code || e.message) + '). Check your connection and sign in again.'); err.code = e.code; throw err; }
@@ -418,6 +424,62 @@ async function firstSignIn(user) {
   finish(uid);
 }
 function finish(uid) { LS.setItem(K.uid, uid); LS.removeItem(K.guest); location.reload(); }
+
+// ---------- account status (v22): Admin can pause / delete accounts ----------
+// users/{uid}.status = 'active' | 'paused' | 'deleted'. firestore.rules is the real lock (paused/deleted can't read or write
+// synced data); this listener blocks the UI live, so a pause takes effect without a reload and a reinstate lifts it.
+let statusUnsub = null, blockedAs = '';
+const BLOCKED = {
+  paused: ['⏸️', 'Account paused', 'An admin has paused this account, so the app is locked for now. Your workouts and food log are kept safe and come back as soon as the account is reinstated.'],
+  deleted: ['🗑️', 'Account deleted', 'This account was deleted by an admin. Its synced data has been removed. You can keep using Mount Up without an account on this device.']
+};
+function blockedText(st) { return st === 'deleted' ? 'This account was deleted by an admin.' : 'This account is paused by an admin. Contact Ronnie to have it reinstated.'; }
+function watchStatus(user) {
+  if (statusUnsub || isAdmin(user)) return; // the admin can never be locked out (rules forbid it too)
+  try {
+    statusUnsub = FS.onSnapshot(FS.doc(db, 'users', user.uid), s => {
+      const st = (s.exists() && s.get('status')) || 'active';
+      if (st === 'paused' || st === 'deleted') blockAccount(st);
+      else if (blockedAs) location.reload(); // reinstated: start fresh
+    }, e => console.warn('Status listener', e && e.code));
+  } catch (e) { console.warn('Status watch skipped', e); }
+}
+function blockScreen() {
+  let el = $('#blockScreen'); if (el) return el;
+  el = document.createElement('section'); el.id = 'blockScreen'; el.className = 'auth block-screen'; el.setAttribute('aria-live', 'polite');
+  document.body.appendChild(el); return el;
+}
+async function blockAccount(st) {
+  if (blockedAs === st) return;
+  blockedAs = st;
+  stopSync(); // no listeners, no uploads (they'd be refused by the rules anyway)
+  const [icon, title, body] = BLOCKED[st];
+  blockScreen().innerHTML = `<div class="auth-inner"><div class="auth-logo"><svg class="auth-mark" viewBox="0 0 484 398" aria-hidden="true"><use href="#mu-mark"/></svg></div>
+    <div class="block-icon" aria-hidden="true">${icon}</div><h1>${title}</h1><p class="auth-sub">${body}</p>
+    ${curUser && curUser.email ? `<div class="note small">${esc(curUser.email)}</div>` : ''}
+    <div class="block-acts">${st === 'paused' ? '<button type="button" class="btn block" data-block-check>Check again</button>' : ''}<button type="button" class="btn block ghost" data-block-out>${st === 'deleted' ? 'Continue without account' : 'Sign out'}</button></div></div>`;
+  html.classList.add('acct-blocked');
+  if (WO.ui && WO.ui.closeSheet) try { WO.ui.closeSheet(); } catch (e) { /* ignore */ }
+  if (st === 'deleted') { // nothing to come back to: clear this device's copy of the account right away
+    const uid = curUid;
+    Object.keys(LS).filter(k => k.startsWith(`u:${uid}:`)).forEach(k => LS.removeItem(k));
+  }
+}
+async function blockedSignOut() {
+  const uid = curUid, st = blockedAs;
+  if (statusUnsub) { try { statusUnsub(); } catch (e) { /* ignore */ } statusUnsub = null; }
+  try { await signOut(auth); } catch (e) { console.warn(e); }
+  await clearDevice(uid);
+  if (st === 'deleted') LS.setItem(K.guest, '1');
+  sessionStorage.setItem('ronnieAuth.flash', st === 'deleted' ? 'Signed out. That account was deleted.' : 'Signed out. This device has been cleared.');
+  location.reload();
+}
+async function blockedCheck() {
+  const b = document.querySelector('[data-block-check]'); if (b) { b.disabled = true; b.textContent = 'Checking…'; }
+  try { const p = await FS.getDocFromServer(FS.doc(db, 'users', curUid)); const st = (p.exists() && p.get('status')) || 'active'; if (st !== 'paused' && st !== 'deleted') return location.reload(); }
+  catch (e) { console.warn(e); }
+  if (b) { b.disabled = false; b.textContent = 'Still paused · Check again'; }
+}
 
 // ---------- sign out / delete ----------
 async function clearDevice(uid) {
@@ -540,6 +602,8 @@ document.addEventListener('click', e => {
   if (t.closest('#acctSignOut')) return doSignOut();
   if (t.closest('#acctDelete')) return doDelete();
   if (t.closest('#acctSync')) { scan(); schedulePush(0); return; }
+  if (t.closest('[data-block-out]')) return blockedSignOut();
+  if (t.closest('[data-block-check]')) return blockedCheck();
 });
 $('#authForm').addEventListener('submit', e => { e.preventDefault(); doEmail(); });
 
@@ -614,12 +678,26 @@ document.addEventListener('click', e => {
 const fmtTs = t => (t && t.toDate ? t.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 const parseJ = d => { try { return JSON.parse(d.get('j')); } catch (e) { return null; } };
 // Users list markup (also used by tools/desktop_shots.mjs via WO.adminPreview to preview the layout with mock rows).
-function usersHtml(rows) {
-  const onb = rows.filter(r => r.onboarded).length;
-  return `<div class="admin-flags-head admin-h"><div><h2 style="margin:0">Users</h2><div class="small muted">Everyone with an account, most recently active first. Open one for activity and coach answers.</div></div></div><div class="admin-stats"><div class="stat"><b>${rows.length}</b><small>Users</small></div><div class="stat"><b>${onb}</b><small>Finished onboarding</small></div><div class="stat"><b>${rows.filter(r => r.lastActive && Date.now() - r.lastActive.toMillis() < 7 * 864e5).length}</b><small>Active 7 days</small></div></div>
-        <div class="card admin-users">` + rows.map(r => `<a href="#admin/${esc(r.id)}" class="entry admin-urow" style="color:inherit;text-decoration:none"><span class="admin-av" aria-hidden="true">${esc(((r.displayName || (r.coach && r.coach.name) || r.email || r.id || '?').trim()[0] || '?').toUpperCase())}</span><div class="grow"><b>${esc(r.email || r.id)}</b><div class="small muted">${esc(r.displayName || (r.coach && r.coach.name) || '')}${(r.displayName || (r.coach && r.coach.name)) ? ' · ' : ''}Joined ${fmtTs(r.createdAt)}</div></div><div class="small muted admin-ucoach">${r.onboarded ? esc(((r.coach && r.coach.goals) || []).map(g => (WO.GOALS[g] || {}).label || g).join(', ')) : '<span class="pill">Not onboarded</span>'}</div><div class="small muted admin-uact" style="text-align:right">Active<br> ${fmtTs(r.lastActive)}</div></a>`).join('') + '</div>';
+// v22: status badge + Pause / Reinstate / Delete on every card except the admin's own account. Deleted accounts are
+// tombstones (status 'deleted', data wiped) and hidden from the list unless "Show deleted" is on.
+const statusOf = r => (r && r.status) || 'active';
+const isProtected = r => !!r && ((curUid && r.id === curUid) || (r.email || '').toLowerCase() === ADMIN_EMAIL);
+let showDeleted = false;
+function userActs(r, detail) {
+  if (isProtected(r)) return `<div class="admin-uacts"><span class="pill rest">You · admin</span></div>`;
+  const st = statusOf(r), id = esc(r.id), sz = detail ? '' : ' sm';
+  if (st === 'deleted') return `<div class="admin-uacts"><button type="button" class="btn${sz} ghost" data-uact="reinstate" data-uid="${id}">Allow back</button></div>`;
+  return `<div class="admin-uacts">${st === 'paused' ? `<button type="button" class="btn${sz}" data-uact="reinstate" data-uid="${id}">▶ Reinstate</button>` : `<button type="button" class="btn${sz} ghost" data-uact="pause" data-uid="${id}">⏸ Pause</button>`}<button type="button" class="btn${sz} danger" data-uact="delete" data-uid="${id}">Delete</button></div>`;
 }
-WO.adminPreview = { usersHtml };
+function statusPill(r) { const st = statusOf(r); return st === 'paused' ? ' <span class="pill warn st-pill">⏸ Paused</span>' : st === 'deleted' ? ' <span class="pill st-pill">Deleted</span>' : ''; }
+function usersHtml(all) {
+  const rows = all.filter(r => showDeleted || statusOf(r) !== 'deleted'), nDel = all.length - all.filter(r => statusOf(r) !== 'deleted').length;
+  const live = all.filter(r => statusOf(r) !== 'deleted'), onb = live.filter(r => r.onboarded).length, nPaused = live.filter(r => statusOf(r) === 'paused').length;
+  return `<div class="admin-flags-head admin-h"><div><h2 style="margin:0">Users</h2><div class="small muted">Everyone with an account, most recently active first. Open one for activity and coach answers. Pause locks someone out (reversible); Delete wipes their data.</div></div></div><div class="admin-stats"><div class="stat"><b>${live.length}</b><small>Users</small></div><div class="stat"><b>${onb}</b><small>Finished onboarding</small></div><div class="stat"><b>${live.filter(r => r.lastActive && Date.now() - r.lastActive.toMillis() < 7 * 864e5).length}</b><small>Active 7 days</small></div>${nPaused ? `<div class="stat"><b>${nPaused}</b><small>Paused</small></div>` : ''}</div>
+        <div class="card admin-users">` + rows.map(r => `<div class="entry admin-urow st-${statusOf(r)}" data-uopen="${esc(r.id)}" role="link" tabindex="0"><span class="admin-av" aria-hidden="true">${esc(((r.displayName || (r.coach && r.coach.name) || r.email || r.id || '?').trim()[0] || '?').toUpperCase())}</span><div class="grow"><b>${esc(r.email || r.id)}</b>${statusPill(r)}<div class="small muted">${esc(r.displayName || (r.coach && r.coach.name) || '')}${(r.displayName || (r.coach && r.coach.name)) ? ' · ' : ''}Joined ${fmtTs(r.createdAt)}</div></div><div class="small muted admin-ucoach">${statusOf(r) === 'deleted' ? 'Data deleted ' + fmtTs(r.deletedAt) : r.onboarded ? esc(((r.coach && r.coach.goals) || []).map(g => (WO.GOALS[g] || {}).label || g).join(', ')) : '<span class="pill">Not onboarded</span>'}</div><div class="small muted admin-uact" style="text-align:right">Active<br> ${fmtTs(r.lastActive)}</div>${userActs(r)}</div>`).join('') + '</div>'
+    + (nDel ? `<div class="small muted admin-delnote"><button type="button" class="linkbtn" data-ushowdel>${showDeleted ? 'Hide' : 'Show'} ${nDel} deleted account${nDel === 1 ? '' : 's'}</button> · Their sign-in still exists in Firebase Auth until removed in the console (they're locked out meanwhile).</div>` : '');
+}
+WO.adminPreview = { usersHtml, userActs, statusPill, setShowDeleted: v => { showDeleted = !!v; }, block: st => blockAccount(st) };
 WO.routes = WO.routes || {}; WO.afterRoute = WO.afterRoute || {};
 WO.routes.admin = arg => {
   if (WO.ui) WO.ui.setTop('Admin', curUser ? esc(curUser.email || '') : '');
@@ -639,6 +717,7 @@ WO.afterRoute.admin = async uid => {
     if (!uid) {
       const s = await FS.getDocsFromServer(FS.collection(db, 'users'));
       const rows = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => ((b.lastActive && b.lastActive.toMillis()) || 0) - ((a.lastActive && a.lastActive.toMillis()) || 0));
+      lastRows = rows;
       box.innerHTML = usersHtml(rows);
       return;
     }
@@ -652,19 +731,73 @@ WO.afterRoute.admin = async uid => {
     const ws = Object.entries((D.weights && D.weights.weights) || {}).sort((a, b) => (a[0] < b[0] ? -1 : 1)), lw = ws[ws.length - 1];
     const foods = Object.keys((D.foodlib && D.foodlib.foods) || {}).length;
     const P = p.exists() ? p.data() : {};
+    const PR = Object.assign({ id: uid }, P);
     const row = (k, v) => `<div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span class="muted">${k}</span><b>${v}</b></div>`;
     const C = P.coach || null, LIM = { flat_back: 'Back: lying flat', squat_back: 'Back: squatting', knees: 'Knees', shoulders: 'Shoulders overhead' };
     const coachHtml = C ? `<div class="card flat"><h3>Coach quiz</h3>` + row('Goals', esc((C.goals || []).map(g => (WO.GOALS[g] || {}).label || g).join(', ') || '—')) + row('Experience', esc(C.experience || '—')) + row('Trains at', esc(((C.gyms || []).concat(C.homeGym ? ['Home gym'] : [])).join(', ') || (C.train || []).join(', ') || '—')) + row('Session length', esc((C.sessionLength || '—') + ' min')) + row('Limitations', esc((C.limitations || []).map(l => LIM[l] || l).join(', ') || 'None')) + row('Goal weight', C.goalWeight ? esc(C.goalWeight + ' ' + (C.units || 'lb')) : '—') + `</div>` : `<div class="card flat small muted">Hasn't finished onboarding yet.</div>`;
-    box.innerHTML = `<div style="color:var(--text)"><a href="#admin" class="small">← All users</a><div style="margin-top:6px"><b style="font-size:16px">${esc(P.email || uid)}</b></div><div class="small muted">${esc(P.displayName || '')} · Joined ${fmtTs(P.createdAt)} · Active ${fmtTs(P.lastActive)}</div><div class="admin-detail"><div class="card flat"><h3>Activity</h3>`
+    box.innerHTML = `<div style="color:var(--text)"><a href="#admin" class="small">← All users</a><div class="admin-dhead"><div><b style="font-size:16px">${esc(P.email || uid)}</b>${statusPill(PR)}</div>${userActs(PR, true)}</div><div class="small muted">${esc(P.displayName || '')} · Joined ${fmtTs(P.createdAt)} · Active ${fmtTs(P.lastActive)}</div><div class="admin-detail"><div class="card flat"><h3>Activity</h3>`
       + row('Workout days completed', woDays) + row('Lifts with a logged weight', Object.keys(log).length) + row('Last lift logged', esc(lastLift || '—'))
       + row('Food days logged', fDays) + row('Food entries', entries) + row('Last food day', esc(lastFood || '—'))
       + row('Latest weight', lw ? `${esc(lw[1])} <span class="small muted">(${esc(lw[0])})</span>` : '—') + row('Weigh-ins', ws.length) + row('Saved foods', foods)
-      + `</div>${coachHtml}</div><div class="small muted" style="margin-top:8px">Read-only view.</div></div>`;
+      + `</div>${coachHtml}</div><div class="small muted" style="margin-top:8px">${statusOf(PR) === 'paused' ? 'Paused' + (P.statusAt ? ' ' + fmtTs(P.statusAt) : '') + ': this person is locked out of the app; their data is kept. ' : ''}Data is read-only here.</div></div>`;
   } catch (e) {
     console.warn('Admin load failed', e);
     box.textContent = e && e.code === 'permission-denied' ? 'Permission denied: publish the admin Firestore rules (firestore.rules) first.' : 'Could not load: ' + ((e && e.message) || e);
   }
 };
+
+// ---------- Admin → Users: pause / reinstate / delete (v22) ----------
+let lastRows = [];
+async function adminWipe(uid) {
+  let n = 0;
+  for (const c of ['data', 'foodDays']) {
+    const s = await FS.getDocsFromServer(userCol(uid, c));
+    for (let i = 0; i < s.docs.length; i += 400) { const b = FS.writeBatch(db); s.docs.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit(); }
+    n += s.size;
+  }
+  return n;
+}
+async function adminSetStatus(uid, act) {
+  if (!curUser || !isAdmin(curUser)) return;
+  await fs();
+  const p = await FS.getDocFromServer(FS.doc(db, 'users', uid));
+  const P = Object.assign({ id: uid }, p.exists() ? p.data() : {}), who = P.email || uid;
+  if (isProtected(P)) { alert('That\'s your own admin account. It can\'t be paused or deleted from here.'); return; }
+  const toast = m => (WO.food && WO.food.toast ? WO.food.toast(m) : alert(m));
+  const stamp = { statusAt: FS.serverTimestamp(), statusBy: curUser.email || '' };
+  if (act === 'pause') {
+    if (!confirm(`Pause ${who}?\n\nThey'll be locked out of the app (live, on every device) until you reinstate them. Their data is kept.`)) return;
+    await FS.setDoc(FS.doc(db, 'users', uid), Object.assign({ status: 'paused' }, stamp), { merge: true });
+    toast(`Paused ${who}.`);
+  } else if (act === 'reinstate') {
+    await FS.setDoc(FS.doc(db, 'users', uid), Object.assign({ status: 'active' }, stamp), { merge: true });
+    toast(`Reinstated ${who}.`);
+  } else if (act === 'delete') {
+    const typed = prompt(`Delete ${who}?\n\nThis locks the account out and permanently wipes their workouts, food log, weigh-ins and coach profile. It can't be undone.\n\nType DELETE to confirm.`);
+    if ((typed || '').trim().toUpperCase() !== 'DELETE') { if (typed !== null) toast('Not deleted (type DELETE to confirm).'); return; }
+    // lock first (so their devices stop syncing), then wipe data, then replace the profile with a bare tombstone
+    await FS.setDoc(FS.doc(db, 'users', uid), Object.assign({ status: 'deleted' }, stamp), { merge: true });
+    const n = await adminWipe(uid);
+    await FS.setDoc(FS.doc(db, 'users', uid), Object.assign({ email: P.email || '', status: 'deleted', deletedAt: FS.serverTimestamp() }, stamp));
+    toast(`Deleted ${who} (${n} record${n === 1 ? '' : 's'} wiped). Remove their login in Firebase console → Authentication.`);
+  }
+}
+document.addEventListener('click', async e => {
+  const sd = e.target.closest('[data-ushowdel]');
+  if (sd) { showDeleted = !showDeleted; const box = $('#adminBox'); if (box && lastRows.length) box.innerHTML = usersHtml(lastRows); return; }
+  const b = e.target.closest('[data-uact]');
+  if (b) {
+    e.preventDefault(); e.stopPropagation();
+    const label = b.textContent; b.disabled = true; b.textContent = '…';
+    try { await adminSetStatus(b.dataset.uid, b.dataset.uact); if (location.hash.startsWith('#admin')) await WO.afterRoute.admin(location.hash.split('/')[1] || ''); }
+    catch (x) { console.warn('Admin action failed', x); alert(x && x.code === 'permission-denied' ? 'Permission denied: publish the v22 firestore.rules (Firebase console → Firestore → Rules) first.' : 'Could not update the account: ' + ((x && x.message) || x)); }
+    finally { if (b.isConnected) { b.disabled = false; b.textContent = label; } }
+    return;
+  }
+  const row = e.target.closest('[data-uopen]');
+  if (row && !e.target.closest('a,button')) location.hash = '#admin/' + row.dataset.uopen;
+}, true);
+document.addEventListener('keydown', e => { const row = e.target.closest && e.target.closest('[data-uopen]'); if (row && e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); location.hash = '#admin/' + row.dataset.uopen; } });
 
 // ---------- boot ----------
 WO.cloud = { handleGuest, _renderFlags: renderFlagsAdmin, status: () => ({ uid: curUid, email: curUser && curUser.email, pending: pendingKeys().length + (scanQueued ? 1 : 0), inflight, gotServer, lastErr: lastErr && (lastErr.code || lastErr.message) }), flush: ms => flush(ms || 10000), _fs: fs, _db: () => db, _auth: auth };
