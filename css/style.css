@@ -447,6 +447,20 @@ html[data-theme="light"] .onboard::before{background:radial-gradient(120% 60% at
 .admin-flags-head{display:flex;flex-direction:column;gap:10px;color:var(--text)}
 .admin-flag code{font-size:11px}
 .admin-detail{display:block}
+.tf-form textarea{width:100%;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 11px;font:inherit;font-size:16px;outline:none;resize:vertical}
+.tf-form textarea:focus{border-color:var(--accent)}
+.tf-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.tf-item{display:flex;flex-direction:column;gap:6px}
+.tf-top{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:flex-start;justify-content:space-between}
+.tf-title{font-size:15px}
+.tf-pills{display:flex;flex-wrap:wrap;gap:4px}
+.tf-notes{white-space:pre-wrap;color:var(--text2)}
+.tf-acts{gap:6px}
+.tf-done,.tf-wontfix{opacity:.62}
+.tf-done .tf-title,.tf-wontfix .tf-title{text-decoration:line-through}
+.pill.tf-p-high{color:var(--danger-ink);border-color:var(--danger-b);background:var(--danger-bg)}
+.pill.tf-s-progress{color:var(--blue-ink);border-color:var(--home-b);background:var(--home-bg)}
+.pill.tf-s-done{color:var(--green-ink);border-color:var(--rest-b);background:var(--rest-bg)}
 @media (min-width:900px){
   html.route-admin body{padding-bottom:0}
   html.route-admin .tabbar{display:none}
@@ -466,6 +480,9 @@ html[data-theme="light"] .onboard::before{background:radial-gradient(120% 60% at
   .admin-flags{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-top:8px}
   .admin-flags .card{margin:0}
   .admin-detail{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px}
+  .tf-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .tf-list{max-width:980px}
+  .tf-form{max-width:980px}
   .admin-detail .card{margin:0}
 }
 

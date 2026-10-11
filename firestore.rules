@@ -11,6 +11,10 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if isAdmin();
     }
+    // Admin → Test feedback (Ronnie's tester list for Titan): admin only, read + write.
+    match /testFeedback/{id} {
+      allow read, write: if isAdmin();
+    }
     match /users/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;   // profile doc
       allow read: if isAdmin();

@@ -8,6 +8,7 @@ import {
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, deleteUser,
   reauthenticateWithCredential, reauthenticateWithPopup, EmailAuthProvider
 } from './vendor/firebase/firebase-auth.js';
+import { renderTest } from './admin-test.js';
 
 const WO = window.WO;
 // Public web config (identifiers, not secrets). Access is enforced by Firestore security rules (users/{uid}/** only).
@@ -499,7 +500,7 @@ function renderAccount() {
     card.innerHTML = `<div class="row between"><h2>Account</h2><span class="pill rest">Cloud sync on</span></div>
       <div class="who"><div class="avatar">${esc((name[0] || '?').toUpperCase())}</div><div class="grow"><b>${esc(u.email || name)}</b><div class="small muted">${pid === 'google.com' ? 'Google account' : 'Email & password'}</div></div></div>
       <div class="small muted" id="acctStatus"></div>
-      <div class="row wrap" style="margin-top:12px"><button class="btn sm ghost" id="acctSync">Sync now</button><button class="btn sm ghost" id="acctSignOut">Sign out</button><button class="btn sm danger" id="acctDelete">Delete account</button></div>${isAdmin(u) ? '<a class="btn sm" href="#admin" style="margin-top:10px;display:inline-flex">🛡️ Admin: users &amp; feature flags</a>' : ''}`;
+      <div class="row wrap" style="margin-top:12px"><button class="btn sm ghost" id="acctSync">Sync now</button><button class="btn sm ghost" id="acctSignOut">Sign out</button><button class="btn sm danger" id="acctDelete">Delete account</button></div>${isAdmin(u) ? '<a class="btn sm" href="#admin" style="margin-top:10px;display:inline-flex">🛡️ Admin: users, flags &amp; test feedback</a>' : ''}`;
   } else if (localUid) {
     card.innerHTML = `<h2>Account</h2><div class="small muted" style="margin:4px 0 10px">Reconnecting…</div><button class="btn sm" data-auth-open>Sign in</button>`;
   } else {
@@ -615,8 +616,8 @@ const parseJ = d => { try { return JSON.parse(d.get('j')); } catch (e) { return 
 WO.routes = WO.routes || {}; WO.afterRoute = WO.afterRoute || {};
 WO.routes.admin = arg => {
   if (WO.ui) WO.ui.setTop('Admin', curUser ? esc(curUser.email || '') : '');
-  const sec = arg === 'flags' ? 'flags' : 'users';
-  const nav = [['users', '#admin', '👥', 'Users'], ['flags', '#admin/flags', '🚦', 'Feature flags']];
+  const sec = arg === 'flags' || arg === 'test' ? arg : 'users';
+  const nav = [['users', '#admin', '👥', 'Users'], ['flags', '#admin/flags', '🚦', 'Feature flags'], ['test', '#admin/test', '🧪', 'Test feedback']];
   return `<div class="admin-shell"><aside class="admin-side"><div class="admin-brand"><svg viewBox="0 0 484 398" aria-hidden="true"><use href="#mu-mark"/></svg><div><b>Mount Up</b><div class="small muted">Admin</div></div></div>
     <nav class="admin-nav">${nav.map(([k, h, i, l]) => `<a href="${h}" class="${sec === k ? 'on' : ''}"><span>${i}</span>${l}</a>`).join('')}<a href="#today"><span>↩</span>Back to app</a></nav></aside>
     <section class="admin-main"><div id="adminBox" class="small muted">${curUser ? 'Loading…' : 'Connecting…'}</div></section></div>`;
@@ -627,6 +628,7 @@ WO.afterRoute.admin = async uid => {
   try {
     await fs();
     if (uid === 'flags') { renderFlagsAdmin(box); return; }
+    if (uid === 'test') { await renderTest(box, { FS, db, user: curUser, esc, toast: m => (WO.food && WO.food.toast ? WO.food.toast(m) : alert(m)) }); return; }
     if (!uid) {
       const s = await FS.getDocsFromServer(FS.collection(db, 'users'));
       const rows = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => ((b.lastActive && b.lastActive.toMillis()) || 0) - ((a.lastActive && a.lastActive.toMillis()) || 0));
