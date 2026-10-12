@@ -302,7 +302,7 @@
       frames: [X(SEATED, { u1: -52, f1: 88, ku1: 0.6 }), X(SEATED, { u1: 86, f1: 88 })], tl: TL2,
       cues: [C(0, 0.4, 'Handles at mid-chest'), C(0.14, 0.46, 'Press out smoothly'), C(0.44, 0.62, 'Don\u2019t lock hard'), C(0.62, 0.94, '2\u20133 sec return'), C(0, 1, 'Back on the pad')] },
     pushup: { anchor: ['A1', [34, 177]], period: 4400, key: 0.53, spineOk: () => true, arcs: [['S', 'E1', 'W1'], ['S', 'H', 'A1']],
-      frames: [{ T: 117, t1: -63, s1: -63, fa1: 24, ikW1: [156, 178], ikW2: [156, 178] }, { T: 98, t1: -82, s1: -82, fa1: 12, ikW1: [156, 178], ikW2: [156, 178] }], tl: TL2,
+      frames: [{ T: 117, t1: -63, s1: -63, fa1: 24, ikW1: [151, 178], ikW2: [151, 178] }, { T: 98, t1: -82, s1: -82, fa1: 12, ikW1: [151, 178], ikW2: [151, 178] }], tl: TL2,
       cues: [C(0, 1, 'Straight line head to heels'), C(0.12, 0.46, 'Elbows ~45°'), C(0.44, 0.62, 'Chest to an inch off floor'), C(0.62, 0.94, 'Push the floor away')] },
     pike: { anchor: ['A1', [52, 172]], period: 4400, key: 0.53, spineOk: () => true, arcs: [['S', 'E1', 'W1'], ['S', 'H', 'K1']],
       frames: [{ T: 58, t1: -22, s1: -22, fa1: 40, ikW1: [118, 178], ikW2: [118, 178] }, { T: 34, t1: -18, s1: -18, fa1: 40, ikW1: [118, 178], ikW2: [118, 178] }], tl: TL2,

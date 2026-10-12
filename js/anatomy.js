@@ -56,7 +56,7 @@
   // (bar / handle width); stance: |z| of the ankles; elbow: extra pole direction for the arm IK [x, y, z-outward];
   // eq: 3-D equipment builder name. Everything else comes straight from the mannequin.js choreography.
   const O3 = {
-    benchbar: { cam: [10, 38], wdown: 12, grip: 25, eq: 'flatbench', rack: true, elbow: [0, -0.6, 1], still: 0.45, flare: 0.6 },
+    benchbar: { cam: [10, 38], wdown: 12, grip: 31, eq: 'flatbench', rack: true, elbow: [0, -0.6, 1], still: 0.45, flare: 0.6 },
     bench: { cam: [20, 20], eq: 'flatbench', wdown: 10, flare: 0.6 }, dbfly: { cam: [36, 28], eq: 'flatbench', wdown: 8 }, skull: { cam: [36, 28], eq: 'flatbench', grip: 7 },
     pushdown: { cam: [50, 8], grip: 6, eq: 'cabletower', elbow: [-1, -0.4, 0.3] },
     incpress: { cam: [40, 14], wdown: 5, eq: 'inclinebench', elbow: [0, -0.4, 1], still: 0.3, flare: 0.45 }, incbar: { cam: [40, 14], eq: 'inclinebench', grip: 24, rack: true },
@@ -69,22 +69,30 @@
     cablecurl: { cam: [50, 8], grip: 6, eq: 'cabletower', still: 0.33 },
     rowbar: { cam: [30, 16], grip: 21, elbow: [-1, 0.6, 0.5], plate: 12 }, bentrow: { cam: [32, 16] },
     dbrow: { cam: [34, 16], eq: 'flatbenchBox', elbow: [-1, 0.6, 0.2] },
-    pushup: { cam: [35, 20], grip: 20, stance: 6, elbow: [-0.4, 0, 1], still: 0.1 },
-    pulldown: { cam: [30, 10], grip: 31, eq: 'pulldown', elbow: [0, -0.3, 1], still: 0.33 }
+    pushupband: { cam: [35, 20], grip: 27, stance: 6, elbow: [-0.4, 0, 1], still: 0.1 }, pushupclose: { cam: [35, 20], grip: 14, stance: 6, still: 0.1 },
+    wgs: { reach: true }, book: { reach: true }, disloc: { cap: 0.98 }, ytw: { cap: 0.98 },
+    pushup: { cam: [35, 20], grip: 27, stance: 6, elbow: [-0.4, 0, 1], still: 0.1 },
+    pulldown: { cam: [30, 10], cap: 0.975, grip: 31, eq: 'pulldown', elbow: [0, -0.3, 1], still: 0.33 }
   };
 
 
   // ---------------- lift the mannequin.js 2-D choreography into a 3-D skeleton ----------------
   const L2 = (p, z) => [p[0], FLOOR - p[1], z || 0];
   const oop = (L, l2) => Math.sqrt(Math.max(0, L * L - l2 * l2)); // out-of-plane component of a foreshortened segment
-  function ik3(S, W, a, b, pole) { // two-bone IK in 3-D -> [elbow, wrist]
+  function ik3(S, W, a, b, pole, cap) { // two-bone IK in 3-D -> [elbow, wrist]
     // joint limits: never fold tighter than ~34° inside the elbow / knee, never lock fully straight (soft 99.6% reach)
     const dmin = Math.sqrt(a * a + b * b - 2 * a * b * Math.cos(34 * R));
-    const v = S3(W, S), d0 = L3(v) || 0.01, d = clamp(d0, dmin, (a + b) * 0.996), u = K3(v, 1 / d0);
+    const v = S3(W, S), d0 = L3(v) || 0.01, d = clamp(d0, dmin, (a + b) * (cap || 0.996)), u = K3(v, 1 / d0);
     const ca = clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1), sa = Math.sqrt(1 - ca * ca);
     let p = S3(pole, K3(u, D3(pole, u))); if (L3(p) < 1e-4) p = ortho([0, -1, 0.01], u); p = N3(p);
     return [A3(A3(S, u, a * ca), p, a * sa), A3(S, u, d)];
   }
+  // pushing lifts: g = +1 load pushed up (bench / overhead: elbow under the hand), -1 pushing down (push-up / dips: elbow over it)
+  const PRESS = { benchbar: { g: 1, tuck: 3, out: 9, lying: 1 }, bench: { g: 1, tuck: 3, out: 8, lying: 1 }, incpress: { g: 1, tuck: 2, out: 11, lying: 1 }, incbar: { g: 1, tuck: 2, out: 11, lying: 1 },
+    mpress: { g: 1, h: 1, tuck: 3, out: 7 }, press: { g: 1, tuck: 0, fwd: 6 }, pressbar: { g: 1, tuck: 0, fwd: 7 }, spress: { g: 1, tuck: 0, fwd: 5 }, spressdb: { g: 1, tuck: 0, fwd: 5 },
+    arnold: { g: 1, tuck: 0, fwd: 7 }, presskb: { g: 1, tuck: 0, fwd: 7 }, pressband: { g: 1, tuck: 0, fwd: 6 },
+    pushup: { g: -1, tuck: 0, out: 16 }, pushupband: { g: -1, tuck: 0, out: 16 }, pushupclose: { g: -1, tuck: 6, out: 2 }, dip: { g: -1, tuck: 0, fwd: -6, out: 6 }, benchdip: { g: -1, tuck: 0, fwd: -6, out: 4 } };
+  const pressOf = (rig, o3) => o3.press || PRESS[rig._name] || null;
   function liftSide(rig, P, q, F, o3) {
     const hz = F.hipZ, sz = F.shZ, Hc = L2(P.H), Stop = L2(P.S);
     const up = N3(S3(Stop, Hc)), lat = [0, 0, 1];
@@ -109,8 +117,21 @@
       if (rig.prop === 'bar' && (rig.propAt === 'back' || rig.propAt === 'front')) { const fw = N3(X3(up, lat)), bc = rig.propAt === 'back' ? sum3(Stop, K3(fw, -5.5), K3(up, 1.5)) : sum3(Stop, K3(fw, 8), K3(up, -0.5)); tgt = A3(bc, [0, -3.6, (o3.grip || 24) * sg]); }
       if (o3.wdown) tgt = A3(tgt, up, -o3.wdown);
       if (o3.hands === 'seat') tgt = sum3(Hc, K3(sk.fwdP0 || [1, 0, 0], 3), [0, -4, (F.hipZ + 8) * sg]);
-      const pole = A3(S3(E, Sh), o3.elbow ? [o3.elbow[0] * 8, o3.elbow[1] * 8, o3.elbow[2] * 8 * sg] : [0, 0, 3 * sg]);
-      [E, W] = ik3(Sh, tgt, LEN.ua, LEN.fa, pole);
+      let pole = A3(S3(E, Sh), o3.elbow ? [o3.elbow[0] * 8, o3.elbow[1] * 8, o3.elbow[2] * 8 * sg] : [0, 0, 3 * sg]);
+      const PR = pressOf(rig, o3);
+      if (PR) { // pressing: the elbow stacks under the load (forearm vertical), tucked ~45-60° toward the hips, not flared to a T
+        const fw = N3(X3(up, lat)), eStar = sum3(tgt, PR.h ? K3(fw, -LEN.fa) : [0, -PR.g * LEN.fa, 0], K3(up, -PR.tuck), K3(fw, PR.fwd || 0), [0, 0, (PR.out || 0) * sg]);
+        pole = S3(eStar, Sh);
+      }
+      if (o3.reach && sg > 0) { // rotation reach (world's greatest / open book): the top arm sweeps floor -> side -> ceiling
+        // in the frontal plane as one long straight lever, instead of a 2-D side arm folding at the elbow mid-arc
+        const ph = clamp(((q.u1 != null ? q.u1 : 0) + 10) / 190, 0, 1) * Math.PI, dir = N3([0.15 * Math.sin(ph), -Math.cos(ph), Math.sin(ph) * 1.1]);
+        tgt = A3(Sh, dir, (LEN.ua + LEN.fa) * 0.993); pole = sum3(K3(up, 3), [0, 0, 0]);
+      }
+      [E, W] = ik3(Sh, tgt, LEN.ua, LEN.fa, pole, o3.cap);
+      // scapula: the shoulder girdle rides up as the arm goes overhead (and slightly forward on a reach) - no fixed ball joint
+      const ua0 = N3(S3(E, Sh)), elev = sstep(0.1, 0.95, D3(ua0, up)) * 3.2, prot = sstep(0.4, 0.95, D3(ua0, N3(X3(up, lat)))) * 1.6 * (PR && PR.g > 0 && !PR.lying ? 0 : 1);
+      if (elev + prot > 0.05) { const Sh2 = sum3(Sh, K3(up, elev), K3(N3(X3(up, lat)), prot)); sk['S' + s] = Sh2; [E, W] = ik3(Sh2, tgt, LEN.ua, LEN.fa, pole, o3.cap); }
       sk['E' + s] = E; sk['W' + s] = W;
     });
     sk.Hd = L2(P.Hd); sk.N0 = A3(Stop, up, 1);
@@ -147,7 +168,7 @@
       const wx = ex + oop(LEN.fa, Math.hypot(Wp[0] - Ep[0], Wp[1] - Ep[1]));
       let E = [ex, Y(Ep), Z(Ep)], W = [wx, Y(Wp), Z(Wp)];
       if (o3.grip != null) W[2] = o3.grip * sg;
-      [E, W] = ik3(Sh, W, LEN.ua, LEN.fa, A3(S3(E, Sh), [-2.5, -2, 3 * sg]));
+      [E, W] = ik3(Sh, W, LEN.ua, LEN.fa, A3(S3(E, Sh), [-2.5, -2, 3 * sg]), o3.cap);
       sk['E' + s] = E; sk['W' + s] = W;
     });
     sk.Hd = [N0[0] + (Y(P.Hd) - N0[1]) * 0 + sk.up[0] * 15, Y(P.Hd), Z(P.Hd)];
@@ -208,7 +229,9 @@
       const dn = K3(sk.upC, -1), bA = N3(A3(K3(sk.upC, -0.55), sk.latC, 0.85 * sg));
       const h0 = transp(transp(sk.latC, dn, bA), bA, ua);
       const hb = X3(ua, fa), m = L3(hb); if (m < 1e-4) return h0;
-      const hn = K3(hb, 1 / m), w = sstep(0.04, 0.7, m) * sstep(-0.3, 0.5, D3(hn, h0));
+      // rotate (not lerp) the rest hinge toward the real bend hinge about the upper-arm axis: the forearm rolls at a steady
+      // rate as the elbow bends, never snapping through a near-zero blend
+const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
       return N3(lerp3(h0, hn, w));
     };
     const hingeLeg = (H, K, A) => {
@@ -232,6 +255,7 @@
       const s = sg > 0 ? 'n' : 'f';
       const Sh = sk['S' + s], E = sk['E' + s], W = sk['W' + s], H = sk['H' + s], K = sk['K' + s], A = sk['A' + s], Tt = sk['T' + s];
       const hA = hingeArm(Sh, E, W, sg), UAf = limbF(Sh, E, hA, sg), FAf = limbF(E, W, hA, sg, UAf);
+      sk['UAf' + s] = UAf; sk['FAf' + s] = FAf; // kept on the skeleton so tools/audit_motion3d.js can check arm roll
       const hL = hingeLeg(H, K, A), THf = limbF(H, K, hL, sg), SHf = limbF(K, A, hL, sg, THf);
       const UA = (t, f, o) => LP(UAf, t, f, o), FA = (t, f, o) => LP(FAf, t, f, o), TH = (t, f, o) => LP(THf, t, f, o), SH = (t, f, o) => LP(SHf, t, f, o);
       const ua = 'ua' + s, fa = 'fa' + s, th = 'th' + s, sh = 'sh' + s;
