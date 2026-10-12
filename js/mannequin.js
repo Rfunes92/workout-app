@@ -503,7 +503,7 @@
     burpee: { anchor: ['A1', [150, 176]], period: 4400, key: 0.38, spineOk: () => true, arcs: [],
       frames: [{ T: 180, t1: 0, s1: 0, u1: 2, f1: 2 }, { T: 150, t1: 100, s1: -38, fa1: 80, u1: 6, f1: 6 }, { T: 114, t1: -66, s1: -66, fa1: 22, u1: 0, f1: 0, ox: -92 },
         { T: 150, t1: 100, s1: -38, fa1: 80, u1: 6, f1: 6 }, { T: 180, t1: 2, s1: -2, fa1: 40, u1: 176, f1: 178, oy: -16 }],
-      tl: [[0, 0], [0.06, 0], [0.2, 1], [0.3, 2], [0.44, 2], [0.54, 3], [0.68, 4], [0.76, 4], [0.9, 5], [1, 5]],
+      tl: [[0, 0], [0.06, 0], [0.2, 1], [0.3, 2], [0.44, 2], [0.52, 3], [0.7, 4], [0.76, 4], [0.9, 5], [1, 5]],
       cues: [C(0.04, 0.2, 'Squat, hands down'), C(0.22, 0.46, 'Jump feet back to plank'), C(0.46, 0.58, 'Feet in'), C(0.6, 0.8, 'Jump up, reach high'), C(0.8, 1.04, 'Land soft')] },
     shadow: { anchor: ['H', [92, 96]], period: 2600, key: 0.25, spineOk: () => true, arcs: [],
       frames: [{ T: 174, t1: 18, s1: 4, fa1: 96, t2: -16, s2: -16, fa2: 64, u1: 40, ku1: 0.8, f1: 164, u2: 24, f2: 168 }, { T: 172, t1: 18, s1: 4, fa1: 96, t2: -16, s2: -16, fa2: 64, u1: 92, f1: 92, u2: 24, f2: 168 },
@@ -560,7 +560,7 @@
       tl: [[0, 0], [0.1, 0], [0.42, 12], [0.58, 12], [0.9, 0], [1, 0]],
       cues: [C(0, 1, 'Sit tall, chest up'), C(0.1, 0.42, 'Knees rise & fall together'), C(0.58, 0.9, 'Knees rise & fall together'), C(0.22, 0.32, 'Feet stay planted'), C(0.4, 0.6, 'Both knees at 90\u00b0'), C(-0.06, 0.12, 'Both knees at 90\u00b0')] },
     couch: { anchor: ['K1', [70, 174]], scene: 'couch', period: 5200, key: 0.62, arcs: [['S', 'H', 'K1']],
-      frames: [{ T: 165, t1: -15, s1: 180, fa1: 180, t2: 88, s2: 0, fa2: 90, u1: 36, f1: 36 }, { T: 184, t1: -15, s1: 180, fa1: 180, t2: 88, s2: 0, fa2: 90, u1: 30, f1: 30 }],
+      frames: [{ T: 165, t1: -15, s1: 196, fa1: 180, t2: 88, s2: 0, fa2: 90, u1: 36, f1: 36 }, { T: 184, t1: -15, s1: 196, fa1: 180, t2: 88, s2: 0, fa2: 90, u1: 30, f1: 30 }],
       tl: [[0, 0], [0.15, 0], [0.45, 1], [0.85, 1], [1, 0]],
       cues: [C(0.1, 0.45, 'Tuck pelvis under'), C(0.3, 0.85, 'Squeeze back-leg glute'), C(0.45, 0.85, 'Tall chest'), C(0.84, 1.1, 'Breathe slow')] },
     book: { anchor: ['H', [80, 110]], scene: 'mat', floor: false, spine: false, period: 6000, key: 0.55, farOff: [2.5, 2.5],
@@ -1076,7 +1076,10 @@
   }
   function staticSvg(ex, which) { // 'good' | 'bad' at the key frame, square, overlay = spine guide only
     const rig = rigFor(ex); if (!rig) return '';
-    const m = mistakeFor(ex), vb = fitBox(rig, true);
+    const m = mistakeFor(ex);
+    if (V26()) { const A = WO.ANATOMY, vb3 = A.fitBox(ex, rig, true);
+      return `<svg viewBox="${vb3.join(' ')}" class="demo-svg mq3d mq3d-${FIG}" role="img" aria-label="${which === 'bad' ? 'Common mistake' : 'Correct form'}"><g>${A.render(ex, rig, A.stillT(rig), { still: true, muscles: ex.primary || [], mod: which === 'bad' && m ? m.mod : null })}</g></svg>`; }
+    const vb = fitBox(rig, true);
     const body = render(rig, rig.key, { overlay: true, noCues: true, still: true, vb, muscles: ex.primary || [], mod: which === 'bad' && m ? m.mod : null, bad: which === 'bad' });
     return `<svg viewBox="${vb.join(' ')}" class="demo-svg mq mq-${FIG}" role="img" aria-label="${which === 'bad' ? 'Common mistake' : 'Correct form'}">${DEFS}<g>${body}</g></svg>`;
   }
@@ -1101,11 +1104,17 @@
   }
 
   // ---------- mount + loop ----------
+  // v26: the 3-D anatomical figure (js/anatomy.js) is the default demo; the v25 flat figure stays as a fallback behind a flag
+  // (?demo=v25 or localStorage mountup.demo = 'v25'), and is used automatically if anatomy.js failed to load.
+  const V26 = () => { if (!WO.ANATOMY) return false; try { if (/[?&]demo=v25\b/.test(location.search) || localStorage.getItem('mountup.demo') === 'v25') return false; } catch (e) { /* ignore */ } return true; };
   const live = new Set(), mounted = new Set(); let raf = null;
-  const draw = (d, c) => { d.c = c; d.g.innerHTML = render(d.rig, c, d.opts); };
+  const draw = (d, c) => { d.c = c; d.g.innerHTML = d.v26 ? WO.ANATOMY.render(d.ex, d.rig, c, d.opts) : render(d.rig, c, d.opts); };
   function loop(ts) {
     live.forEach(d => { if (!d.g.isConnected) { live.delete(d); mounted.delete(d); return; }
-      const dt = d.last == null ? 0 : ts - d.last; d.last = ts; if (d.paused) return; draw(d, (d.c || 0) + dt * (d.speed || 1) / d.rig.period); });
+      const dt = d.last == null ? 0 : ts - d.last; d.last = ts; if (d.paused) return;
+      const c = (d.c || 0) + dt * (d.speed || 1) / d.rig.period;
+      // v26 frames are rich 3-D SVG: repaint at ~30 fps (motion stays smooth, phone CPU stays cool)
+      if (d.v26 && d.drawn != null && ts - d.drawn < 30) { d.c = c; return; } d.drawn = ts; draw(d, c); });
     raf = live.size ? requestAnimationFrame(loop) : null;
   }
   const DEFS = '<defs><linearGradient id="mqShade" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--mq-hi)"/><stop offset="1" style="stop-color:var(--mq-lo)"/></linearGradient><linearGradient id="mqFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--mq-hi)"/><stop offset="1" style="stop-color:var(--mq-mid)"/></linearGradient>' +
@@ -1119,16 +1128,18 @@
     mo = mo || {};
     let rig = rigFor(ex) || normalize(RIGS[GENERIC.stand]);
     if (rig.view && mo.view && mo.view !== rig.view) rig = Object.assign({}, rig, { view: mo.view }); // front <-> back: same pose, other side of the body
-    const small = container.classList.contains('ex-thumb'), vb = fitBox(rig, small, mo.coach && !small ? pinsFor(rig) : null);
+    const small = container.classList.contains('ex-thumb'), v26 = V26();
+    const vb = v26 ? WO.ANATOMY.fitBox(ex, rig, small) : fitBox(rig, small, mo.coach && !small ? pinsFor(rig) : null);
     if (!rigFor(ex) && window.console) console.warn('[mannequin] no rig for', ex.id, '- using generic pose');
-    container.innerHTML = `<svg viewBox="${vb.join(' ')}" class="demo-svg mq mq-${FIG}" role="img" aria-label="Posture demo of ${String(ex.name).replace(/"/g, '')} (${FIG} figure)">${DEFS}<g></g></svg>`;
+    container.innerHTML = `<svg viewBox="${vb.join(' ')}" class="demo-svg ${v26 ? 'mq3d mq3d' : 'mq mq'}-${FIG}" role="img" aria-label="Posture demo of ${String(ex.name).replace(/"/g, '')} (${FIG} figure)">${v26 ? '' : DEFS}<g></g></svg>`;
     const g = container.querySelector('g'), still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     const frozen = API.freeze != null, fz = API.freeze === 'key' ? rig.key : +API.freeze;
-    const d = { g, svg: container.firstElementChild, ex, container, rig, speed: mo.speed || 1, last: null, opts: { overlay: !small, still: still || frozen, vb, muscles: ex.primary || [], muscles2: mo.coach ? (ex.secondary || []) : [], pins: !!mo.coach && !small } };
+    const d = { g, svg: container.firstElementChild, ex, container, rig, v26, speed: mo.speed || 1, last: null, opts: { overlay: !small, still: still || frozen, vb, muscles: ex.primary || [], muscles2: mo.coach ? (ex.secondary || []) : [], pins: !!mo.coach && !small } };
     mounted.forEach(o => { if (o.container === container) { mounted.delete(o); live.delete(o); } });
     mounted.add(d);
     // Reduce Motion (and thumbnails): show the KEY position of the movement, not whatever frame the loop was on
-    draw(d, frozen ? fz : small || still ? rig.key : 0);
+    const keyT = v26 ? WO.ANATOMY.stillT(rig) : rig.key;
+    draw(d, frozen ? (API.freeze === 'key' ? keyT : fz) : small || still ? keyT : 0);
     if (still || frozen || small) { d.paused = true; return d; }
     live.add(d); if (!raf) raf = requestAnimationFrame(loop);
     return d;
@@ -1145,7 +1156,7 @@
   function setFigure(f) {
     if (f !== 'male' && f !== 'female') f = 'male';
     FIG = f; try { localStorage.setItem('mountup.figure', f); } catch (e) { /* ignore */ }
-    mounted.forEach(d => { if (!d.g.isConnected) { mounted.delete(d); live.delete(d); return; } d.svg.setAttribute('class', `demo-svg mq mq-${FIG}`); if (!live.has(d)) draw(d, d.c); });
+    mounted.forEach(d => { if (!d.g.isConnected) { mounted.delete(d); live.delete(d); return; } d.svg.setAttribute('class', d.v26 ? `demo-svg mq3d mq3d-${FIG}` : `demo-svg mq mq-${FIG}`); if (!live.has(d)) draw(d, d.c); });
     document.querySelectorAll('[data-fig-set]').forEach(b => { const on = b.dataset.figSet === FIG; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
     return FIG;
   }

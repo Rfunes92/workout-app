@@ -1,0 +1,17 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>v26 in-app demo check</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>body{background:#fff;padding:10px}.grid{display:grid;grid-template-columns:repeat(3,360px);gap:10px}.demo{height:270px;border:1px solid #e3e6ea;border-radius:12px}.ex-thumb{width:90px;height:90px;display:inline-block;border:1px solid #e3e6ea;border-radius:10px;margin:4px}small{display:block;font:600 12px system-ui;color:#555}#log{font:12px monospace;color:#a00}</style>
+</head><body>
+<!-- Mounts demos through the REAL app path (WO.mountDemo / staticSvg) to check the v26 wiring: animated, thumbnails, mistake still -->
+<div class="grid" id="g"></div><div id="th"></div><div id="log"></div>
+<script src="../js/exercises.js"></script><script src="../js/mannequin.js"></script><script src="../js/anatomy.js"></script>
+<script>
+window.onerror=(m)=>{document.getElementById('log').textContent+=m+'\n'};
+const qs=new URLSearchParams(location.search);if(qs.get('fig'))WO.setFigure(qs.get('fig'));if(qs.get('freeze'))WO.MANNEQUIN.freeze=qs.get('freeze');
+const ids=(qs.get('ids')||'bb_bench,bb_back_squat,pushup').split(',');
+ids.forEach(id=>{const ex=WO.EX_BY_ID[id];const c=document.createElement('div');c.innerHTML='<div class="demo"></div><small>'+ex.name+'</small>';g.appendChild(c);WO.mountDemo(c.querySelector('.demo'),ex,{});});
+ids.forEach(id=>{const d=document.createElement('div');d.className='ex-thumb';th.appendChild(d);WO.mountDemo(d,WO.EX_BY_ID[id],{});});
+const s=document.createElement('div');s.className='ex-thumb';s.innerHTML=WO.MANNEQUIN.staticSvg(WO.EX_BY_ID[ids[1]],'bad');th.appendChild(s);
+document.getElementById('log').textContent+='svg3d='+document.querySelectorAll('svg.mq3d').length+' svg25='+document.querySelectorAll('svg.mq').length;
+</script></body></html>

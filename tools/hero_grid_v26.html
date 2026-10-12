@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Mount Up v26 anatomical hero grid</title>
+<style>html,body{margin:0;background:#fff;font:600 11px system-ui,sans-serif}body{padding:10px}.g{display:grid;grid-template-columns:repeat(var(--cols,4),var(--w,250px));border-left:1px solid #d9dce0;border-top:1px solid #d9dce0;width:max-content}
+.c{border-right:1px solid #d9dce0;border-bottom:1px solid #d9dce0;background:#fff;position:relative;aspect-ratio:4/3}.c svg{display:block;width:100%;height:100%}.c small{position:absolute;left:6px;top:4px;color:#8a919b;font-size:10px}</style></head>
+<body><div class="g" id="g"></div>
+<script src="../js/exercises.js"></script><script src="../js/mannequin.js"></script><script src="../js/anatomy.js"></script>
+<script>
+// Usage: hero_grid_v26.html?fig=male|female&cols=4&w=250&t=key|0.3&ts=0,0.25,0.5&ids=a,b|all&labels=0&from=0&n=24
+const qs=new URLSearchParams(location.search),A=WO.ANATOMY;if(qs.get('fig'))WO.setFigure(qs.get('fig'));
+const root=document.documentElement.style;if(qs.get('cols'))root.setProperty('--cols',qs.get('cols'));if(qs.get('w'))root.setProperty('--w',qs.get('w')+'px');
+const HERO='bb_bench,cable_pushdown,incline_db_press,leg_extension,farmer_carry,bb_back_squat,cable_row,ez_curl,bb_row,db_row,pushup,lat_pulldown';
+let ids=qs.get('ids')==='all'?WO.EXERCISES.map(e=>e.id):(qs.get('ids')||HERO).split(',');
+if(qs.get('from'))ids=ids.slice(+qs.get('from'),+qs.get('from')+(+qs.get('n')||24));
+const CAM=qs.get('cam')?qs.get('cam').split(',').map(Number):undefined;const tqs=(qs.get('ts')||qs.get('t')||'key').split(',');
+ids.forEach(id=>tqs.forEach(tq=>{const ex=WO.EX_BY_ID[id];if(!ex)return;const r=A.rigOf(ex),t=tq==='key'?A.stillT(r):+tq,vb=A.fitBox(ex,r,false,CAM);
+ const c=document.createElement('div');c.className='c';
+ c.innerHTML='<svg viewBox="'+vb.join(' ')+'">'+A.render(ex,r,t,{cam:CAM,still:true,muscles:ex.primary||[]})+'</svg>'+(qs.get('labels')==='0'?'':'<small>'+ex.name+(tqs.length>1?' · t='+tq:'')+'</small>');
+ document.getElementById('g').appendChild(c);}));
+</script></body></html>

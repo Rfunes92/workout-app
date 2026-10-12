@@ -1,0 +1,11 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Mount Up v26 figure: four sides</title>
+<style>html,body{margin:0;background:#fff;font:600 13px system-ui,sans-serif}.c{width:600px;height:700px;position:relative}.c svg{width:100%;height:100%;display:block}.c small{position:absolute;left:10px;top:8px;color:#8a919b}</style></head>
+<body><div class="c" id="c"></div>
+<script src="../js/exercises.js"></script><script src="../js/mannequin.js"></script><script src="../js/anatomy.js"></script>
+<script>
+// four_sides_v26.html?yaw=90&pitch=6&fig=male&label=Front  (yaw: 0 = right side, 90 = front, 180 = left side, -90 = back)
+const qs=new URLSearchParams(location.search),A=WO.ANATOMY;WO.setFigure(qs.get('fig')||'male');
+const ex=WO.EX_BY_ID.bw_squat,r=A.rigOf(ex),cam=[+(qs.get('yaw')||90),+(qs.get('pitch')||6)];
+const vb=A.fitBox(ex,r,false,cam);const h=vb[3],w=h*6/7;vb[0]+= (vb[2]-w)/2;vb[2]=w;
+document.getElementById('c').innerHTML='<svg viewBox="'+vb.join(' ')+'">'+A.render(ex,r,0,{still:true,muscles:[],cam})+'</svg><small>'+(qs.get('label')||'')+'</small>';
+</script></body></html>
