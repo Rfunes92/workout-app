@@ -40,7 +40,9 @@
     frame: { lo: [170, 176, 184], hi: [252, 252, 253], line: '#7d848e' },
     pad: { lo: [22, 24, 28], hi: [80, 85, 93], line: '#131518' },
     iron: { lo: [24, 26, 30], hi: [92, 97, 106], line: '#101114' },
-    steel: { lo: [110, 116, 124], hi: [226, 229, 233], line: '#4c525b' }
+    steel: { lo: [110, 116, 124], hi: [226, 229, 233], line: '#4c525b' },
+    kb: { lo: [20, 22, 26], hi: [96, 100, 108], line: '#0d0e10' },
+    rubber: { lo: [150, 34, 26], hi: [236, 96, 76], line: '#7c1611' }
   };
   const mix = (a, b, k) => 'rgb(' + [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * k)).join(',') + ')';
   const shadeCol = (pal, lam) => mix(PAL[pal].lo, PAL[pal].hi, clamp(lam, 0, 1));
@@ -70,6 +72,7 @@
     rowbar: { cam: [30, 16], grip: 21, elbow: [-1, 0.6, 0.5], plate: 12 }, bentrow: { cam: [32, 16] },
     dbrow: { cam: [34, 16], eq: 'flatbenchBox', elbow: [-1, 0.6, 0.2] },
     pushupband: { cam: [35, 20], grip: 27, stance: 6, elbow: [-0.4, 0, 1], still: 0.1 }, pushupclose: { cam: [35, 20], grip: 14, stance: 6, still: 0.1 },
+    ccrunch: { cam: [42, 10], eq: 'cabletower', rope: true, still: 0.5 }, swing: { cam: [44, 8], still: 0.02, grip: 4.5 }, goblet: { grip: 6.5, cam: [44, 8] }, ohext: { cap: 0.98 }, pallof: { grip: 4.5 }, rollout: { grip: 9 },
     wgs: { reach: true }, book: { reach: true }, disloc: { cap: 0.98 }, ytw: { cap: 0.98 },
     pushup: { cam: [35, 20], grip: 27, stance: 6, elbow: [-0.4, 0, 1], still: 0.1 },
     pulldown: { cam: [30, 10], cap: 0.975, grip: 31, eq: 'pulldown', elbow: [0, -0.3, 1], still: 0.33 }
@@ -134,7 +137,7 @@
       if (elev + prot > 0.05) { const Sh2 = sum3(Sh, K3(up, elev), K3(N3(X3(up, lat)), prot)); sk['S' + s] = Sh2; [E, W] = ik3(Sh2, tgt, LEN.ua, LEN.fa, pole, o3.cap); }
       sk['E' + s] = E; sk['W' + s] = W;
     });
-    sk.Hd = L2(P.Hd); sk.N0 = A3(Stop, up, 1);
+    sk.Hd = L2(P.Hd); sk.N0 = A3(Stop, up, 1); sk.P2 = P;
     return sk;
   }
   function liftFront(rig, P, q, F, o3) {
@@ -172,7 +175,7 @@
       sk['E' + s] = E; sk['W' + s] = W;
     });
     sk.Hd = [N0[0] + (Y(P.Hd) - N0[1]) * 0 + sk.up[0] * 15, Y(P.Hd), Z(P.Hd)];
-    sk.N0 = N0;
+    sk.N0 = N0; sk.P2 = P; sk.cx = cx; sk.zs = zs;
     return sk;
   }
   // frames
@@ -313,14 +316,28 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
       spn(fa, 'forearms', FA(0.0, 0.6, -2.6 * fk), FA(0.24, 2.4 * fk, -3 * fk), FA(0.78, 0.6, -1.2), 3.2 * fk, LN(FAf, 0.6, -1), { pk: 0.3, fib: 4 });
       spn(fa, 'forearms', FA(0.02, -2, 1), null, FA(0.82, -1.2, 0.4), 2.7 * fk, LN(FAf, -1, 0.3), { pk: 0.3, fib: 3 });
       const hc = FA(1.13, 0.2, 0);
-      // hand: a fist that eases (no pop) into a flat, planted palm as the wrist reaches the floor
+      // hand (v26.2, Ronnie: "the mannequin has no hands"): palm + four fingers + thumb. The fingers curl around whatever the
+      // hand holds (bar / dumbbell / handle / kettlebell = grip 1), hang relaxed when empty (grip ~.35), and blend - with the
+      // same primitive count, so nothing pops - into a flat palm with straight fingers when the hand is planted on the floor.
       {
-        const kf = sstep(13, 6, W[1]) * sstep(-0.2, -0.6, FAf.a[1]);
-        const hx = N3([sk.fwdP[0], 0, sk.fwdP[2] + 0.25 * sg]), hz = N3(X3(hx, UP));
-        const mixP = (a, b) => lerp3(a, b, kf), mixA = (A, B) => A.map((v, i) => lerp3(v, B[i], kf));
-        ell(fa, null, mixP(FA(1.08, 0.2, 0), sum3(W, K3(hx, 2.4), [0, -2.6, 0])), mixA([K3(FAf.a, 3.2 * fk), K3(FAf.fr, 2.0 * fk), K3(FAf.ou, 2.9 * fk)], [K3(hx, 3.2 * fk), [0, 1.5 * fk, 0], K3(hz, 3.2 * fk)]), N3(lerp3(FAf.ou, UP, kf)), null, { hand: true, core: true });
-        ell(fa, null, mixP(FA(1.2, 1.0, 0), sum3(W, K3(hx, 6.2), [0, -3.4, 0])), mixA([K3(FAf.a, 2.4 * fk), K3(FAf.fr, 2.2 * fk), K3(FAf.ou, 2.8 * fk)], [K3(hx, 2.6 * fk), [0, 1.0 * fk, 0], K3(hz, 3.0 * fk)]), N3(lerp3(FAf.fr, UP, kf)), null, { hand: true, core: true });
-        spn(fa, null, mixP(FA(1.0, 1.6, 2.4 * fk), sum3(W, K3(hz, -2.6 * sg * fk), [0, -2, 0])), null, mixP(FA(1.17, 2.9, 1.4), sum3(W, K3(hx, 4), K3(hz, -4.2 * sg * fk), [0, -3, 0])), 1.25 * fk, N3(lerp3(LN(FAf, 1, 0.5), UP, kf)), { fib: 0, te: 0.7 });
+        const kf = sstep(13, 6, W[1]) * sstep(-0.2, -0.6, FAf.a[1]), g = o3.handGrip != null ? o3.handGrip : 0.35;
+        const a = FAf.a, fr = FAf.fr, ou = FAf.ou, hk = fk * (fem ? 0.9 : 1);
+        const hx = N3([sk.fwdP[0], 0, sk.fwdP[2] + 0.25 * sg]), hz = N3(X3(hx, UP)), fl = [0, -2.7, 0];
+        const mp = (p, q) => lerp3(p, q, kf), mA = (A, B) => A.map((v, i) => lerp3(v, B[i], kf));
+        const P = (u, f, o) => sum3(W, K3(a, u * hk), K3(fr, f * hk), K3(ou, o * hk));
+        const Q = (x, z, y) => sum3(W, fl, K3(hx, x * hk), K3(hz, z * sg * hk), [0, (y || 0) * hk, 0]);
+        // palm (back of the hand slightly domed)
+        ell(fa, null, mp(P(2.7, -0.1, 0.2), Q(2.8, 0)), mA([K3(a, 3.1 * hk), K3(fr, 1.35 * hk), K3(ou, 2.75 * hk)], [K3(hx, 3.0 * hk), [0, 1.2 * hk, 0], K3(hz, 2.8 * hk)]), N3(lerp3(K3(fr, -1), UP, kf)), null, { hand: true, core: true });
+        // fingers: index (thumb side) -> little finger
+        [[1.55, 0.6, 0.98], [0.52, 0.66, 1.06], [-0.52, 0.63, 1.0], [-1.5, 0.52, 0.82]].forEach(([w, r, ln]) => {
+          const ku = 5.3 - Math.abs(w) * 0.32;
+          // fist: knuckles past the handle, the fingers hook ~180° round it and the tips come back to the palm
+          const K0 = P(ku, -0.25, w), C0 = P(ku + (1.8 * ln) * (1 - g) + 1.15 * g, 0.2 + 1.55 * g, w * 0.97), T0 = P(ku + (3.2 * ln) * (1 - g) - 1.9 * g, 0.1 + 2.75 * g, w * 0.93);
+          const K1 = Q(ku + 0.2, w), C1 = Q(ku + 1.8 * ln, w * 1.04, -0.15), T1 = Q(ku + 3.5 * ln, w * 1.1, -0.3);
+          spn(fa, null, mp(K0, K1), mp(C0, C1), mp(T0, T1), r * hk, N3(lerp3(K3(fr, -1), UP, kf)), { fib: 0, te: 0.62, pk: 0.45, hand: true });
+        });
+        // thumb: wraps over the fingers on a grip, sits alongside when open, splays out when flat
+        spn(fa, null, mp(P(1.4, 0.9, 1.9), Q(1.6, 2.4)), mp(P(2.9, 1.5 + 0.6 * g, 2.6 - 0.9 * g), Q(3.0, 3.6, -0.1)), mp(P(4.2 + 0.3 * g, 1.3 + 1.3 * g, 2.6 - 2.0 * g), Q(4.3, 4.4, -0.2)), 0.72 * hk, N3(lerp3(LN(FAf, 1, 0.5), UP, kf)), { fib: 0, te: 0.6, pk: 0.4, hand: true });
       }
 
       // ---- leg ----
@@ -383,8 +400,10 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
     const disc = (c, ax, r, th, col, extra) => out.push(Object.assign({ k: 'disc', c, ax, r, th, col }, extra || {}));
     const cable = (a, b) => out.push({ k: 'line', a, b, w: 0.7, stroke: '#3d434b' });
     const Wn = sk.Wn, Wf = sk.Wf, mid = lerp3(Wn, Wf, 0.5);
-    const handOff = (W, E) => A3(W, N3(S3(W, E)), 4.2);
-    const Hn = handOff(sk.Wn, sk.En), Hf = handOff(sk.Wf, sk.Ef), Hm = lerp3(Hn, Hf, 0.5);
+    // grip point = inside the curled fingers (just in front of the palm), so bars / handles / bells sit IN the hand
+    const g0 = o3.handGrip != null ? o3.handGrip : 0.35, hk0 = (WO.getFigure && WO.getFigure() === 'female') ? 0.9 : 1;
+    const handOff = (W, E, s2) => { const F = sk['FAf' + s2], a = N3(S3(W, E)); return F ? sum3(W, K3(a, 4.3 * hk0), K3(F.fr, 1.35 * g0 * hk0)) : A3(W, a, 4.3); };
+    const Hn = handOff(sk.Wn, sk.En, 'n'), Hf = handOff(sk.Wf, sk.Ef, 'f'), Hm = lerp3(Hn, Hf, 0.5);
     const fy = FLOOR - FLOOR; // floor y = 0
     const eq = o3.eq;
     const legsUnder = (x0, x1, top, zw) => { [x0 + 6, x1 - 6].forEach(x => { tube([x, top, 0], [x, fy + 1.5, 0], 1.5, 'frame', { back: true }); tube([x, fy + 1.2, -zw], [x, fy + 1.2, zw], 1.4, 'frame', { back: true }); }); };
@@ -425,9 +444,9 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
       let tx, ty0, ty1, tz = -6, pullY;
       const line = (rig.lines || [])[0];
       const anc = line && typeof line[1] !== 'string' ? L2(line[1]) : [Hm[0] + 30, 175, 0];
-      if (eq === 'cabletower') { tx = Math.max(anc[0] + 12, Hm[0] + 22); pullY = anc[1]; }
+      if (eq === 'cabletower') { tx = rig.tower != null ? rig.tower + (rig.tower > Hm[0] ? 2 : -2) : Math.max(anc[0] + 12, Hm[0] + 22); pullY = anc[1]; }
       if (eq === 'lowrow') { tx = anc[0] + 4; pullY = anc[1]; }
-      if (eq === 'pulldown') { tx = sk.Hc[0] - 24; pullY = anc[1]; }
+      if (eq === 'pulldown') { tx = Math.max(sk.Kn[0], sk.Kf[0]) + 16; pullY = anc[1]; }
       ty0 = 0; ty1 = Math.max(pullY + 8, 176);
       [-1, 1].forEach(sg => tube([tx, ty0, tz + 9 * sg], [tx, ty1, tz + 9 * sg], 2.2, 'frame', { back: true }));
       tube([tx, ty1, tz - 11], [tx, ty1, tz + 11], 2.2, 'frame', { back: true });
@@ -435,9 +454,13 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
       tube([tx - 14, 1.4, tz - 13], [tx + 14, 1.4, tz - 13], 1.8, 'frame', { back: true }); tube([tx - 14, 1.4, tz + 13], [tx + 14, 1.4, tz + 13], 1.8, 'frame', { back: true });
       if (eq === 'cabletower') {
         const pul = [anc[0], pullY, 0];
-        tube([pul[0], ty1, 0], [tx, ty1, 0], 2, 'frame', { back: true }); disc(pul, [0, 0, 1], 3.2, 1.6, 'frame', { back: true });
-        cable(pul, Hm);
-        tube(A3(Hm, [0, 0, 1], -9), A3(Hm, [0, 0, 1], 9), 1.3, 'steel', { front: true });
+        if (Math.abs(pul[0] - tx) > 1) tube([pul[0], ty1, 0], [tx, ty1, 0], 2, 'frame', { back: true });
+        disc(pul, [0, 0, 1], 3.2, 1.6, 'frame', { back: true });
+        const src = line && line[0], end = src === 'A1' ? sk.An : src === 'A2' ? sk.Af : Hm;
+        if (o3.rope) { // rope attachment: two tails from the pulley clip to each hand
+          const clip = lerp3(pul, Hm, 0.82); cable(pul, clip); [Hn, Hf].forEach(h => out.push({ k: 'line', a: clip, b: h, w: 1.5, stroke: '#3a3f47' }));
+        } else { cable(pul, end); if (end === Hm && rig.prop === 'handle') tube(A3(Hm, [0, 0, 1], -(o3.grip || 6) - 3), A3(Hm, [0, 0, 1], (o3.grip || 6) + 3), 1.3, 'steel', { front: true }); }
+        if (end !== Hm) { tube(A3(end, [0, 0, 1], -3), A3(end, [0, 0, 1], 3), 2.4, 'pad', {}); }
       }
       if (eq === 'lowrow') {
         const pul = [tx - 4, pullY, 0]; disc(pul, [0, 0, 1], 3.2, 1.6, 'frame', { back: true });
@@ -453,15 +476,17 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
       }
       if (eq === 'pulldown') {
         const H = sk.Hc, top = [tx, ty1 + 6, 0];
-        tube([tx, ty1, 0], [Hm[0] + 2, ty1 + 6, 0], 2.2, 'frame', { back: true });
-        disc([anc[0], ty1 + 4, 0], [0, 0, 1], 3, 1.6, 'frame', { back: true });
-        cable([anc[0], ty1 + 2, 0], Hm);
+        // top beam runs from the stack (in front of the knees) back over the lifter's head to the pulley
+        const px = sk.Hd[0] + 9;
+        tube([tx, ty1, 0], [px - 2, ty1 + 6, 0], 2.2, 'frame', { back: true });
+        disc([px, ty1 + 4, 0], [0, 0, 1], 3, 1.6, 'frame', { back: true });
+        cable([px, ty1 + 2, 0], Hm);
         box([H[0] + 4, H[1] - 12.5, 0], [15, 3.2, 12], 'pad', { back: true });
         tube([H[0] + 2, H[1] - 16, 0], [H[0] + 2, 1.4, 0], 2.2, 'frame', { back: true });
         tube([H[0] - 10, 1.4, 0], [tx, 1.4, 0], 2, 'frame', { back: true });
         // knee pads over the thighs
-        const K = lerp3(sk.Kn, sk.Kf, 0.5); [-1, 1].forEach(sg => tube([K[0] - 6, K[1] + 7.5, 4 * sg], [K[0] - 6, K[1] + 7.5, 15 * sg], 3.4, 'pad', { cap: true, front: sg > 0 }));
-        tube([K[0] - 6, K[1] + 7.5, -2], [tx, K[1] + 7.5, -2], 1.4, 'frame', { back: true });
+        const K = lerp3(sk.Kn, sk.Kf, 0.5); [-1, 1].forEach(sg => tube([K[0] - 4, K[1] + 7, 4 * sg], [K[0] - 4, K[1] + 7, 15 * sg], 3.4, 'pad', { cap: true, front: sg > 0 }));
+        tube([K[0] - 4, K[1] + 7, -2], [tx, K[1] + 7, -2], 1.4, 'frame', { back: true });
         // lat bar with angled ends
         const bz = 34, bend = 6;
         tube([Hm[0], Hm[1], -bz + 6], [Hm[0], Hm[1], bz - 6], 1.2, 'steel', { front: true });
@@ -469,11 +494,97 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
         void top;
       }
     }
+    // ---- generic 3-D scenery from the mannequin.js scene names (only where no hand-built hero rig exists) ----
+    const oy = o3.oy || 0, P2 = sk.P2 || {};
+    const m2 = (p, z) => (rig.view ? [0, FLOOR - p[1] + oy, (p[0] - sk.cx) * sk.zs] : [p[0], FLOOR - p[1] + oy, z || 0]);
+    const post = (x, z, top, r) => tube([x, fy, z], [x, top, z], r || 2, 'frame', { back: z <= 0 });
+    const scene = eq ? null : rig.scene;
+    const upT = sk.up, fwT = sk.fwdP, H0 = sk.Hc;
+    const seatUnder = (w, d) => { box([H0[0] + 2, H0[1] - 12.5, 0], [d || 15, 3.2, w || 12], 'pad', { back: true }); post(H0[0] + 2, 0, H0[1] - 16, 2.2); tube([H0[0] - 18, fy + 1.2, 0], [H0[0] + 22, fy + 1.2, 0], 1.8, 'frame', { back: true }); };
+    const backPad = (len, off) => out.push({ k: 'obox', c: sum3(H0, K3(upT, len * 0.55), K3(fwT, -(off || 11))), ax: [K3(upT, len * 0.55), K3(fwT, 3.2), [0, 0, 11]], col: 'pad', back: true });
+    if (scene === 'bar' && rig.bar) {
+      const [x0, x1, by] = rig.bar;
+      if (name === 'dip') { [-1, 1].forEach(sg => { const z = (Math.abs(Hn[2]) + 0.5) * sg; tube(m2([x0 - 10, by + 2], z), m2([x1 + 6, by + 2], z), 1.8, 'steel', { back: sg < 0, front: sg > 0 }); post(x1 - 2, z, FLOOR - by - 2 + oy, 2); post(x0 - 6, z, FLOOR - by - 2 + oy, 2); }); }
+      else { const bx = Hm[0], yb = Hm[1] + 1.2; tube([bx, yb, -44], [bx, yb, 44], 1.5, 'steel', { split: true }); [-1, 1].forEach(sg => { post(bx, 44 * sg, yb, 2.2); tube([bx - 18, fy + 1, 44 * sg], [bx + 18, fy + 1, 44 * sg], 1.6, 'frame', { back: sg < 0 }); }); }
+    } else if (scene === 'lowbar' && rig.bar) {
+      const c = m2(rig.bar); tube([c[0], c[1], -40], [c[0], c[1], 40], 1.5, 'steel', { split: true }); [-1, 1].forEach(sg => post(c[0], 40 * sg, c[1], 2));
+    } else if (scene === 'box' && rig.box) {
+      const [x0, x1, top, kind] = rig.box, yT = FLOOR - top + oy;
+      if (kind === 'box') box([(x0 + x1) / 2, yT / 2, 0], [(x1 - x0) / 2, yT / 2, 14], 'pad', { back: true });
+      else { box([(x0 + x1) / 2, yT - 3.2, 0], [(x1 - x0) / 2, 3.2, 11], 'pad', { back: true }); legsUnder(x0, x1, yT - 6.5, 13); }
+    } else if (scene === 'bench') {
+      box([87, FLOOR - 134 - 3.2 + oy, 0], [47, 3.2, 11], 'pad', { back: true }); legsUnder(40, 134, FLOOR - 134 - 6.5 + oy, 13);
+    } else if (scene === 'incline' || scene === 'machine') {
+      seatUnder(12, 17); backPad(52, 12); post(H0[0] - 16, -10, H0[1] + 30, 2);
+    } else if (scene === 'pad') { // chest-supported row: incline pad in front of the torso
+      const c = sum3(H0, K3(upT, 24), K3(fwT, 13));
+      out.push({ k: 'obox', c, ax: [K3(upT, 22), K3(fwT, 3.2), [0, 0, 11]], col: 'pad', back: true });
+      tube(sum3(c, K3(upT, -10), K3(fwT, 3)), [c[0] + 6, fy + 1, 0], 2.2, 'frame', { back: true }); tube([c[0] - 18, fy + 1.2, 0], [c[0] + 26, fy + 1.2, 0], 1.8, 'frame', { back: true });
+    } else if (scene === 'tower' || scene === 'towers') {
+      const ls = rig.lines || [];
+      ls.forEach(([from, anc]) => { if (typeof anc === 'string') return;
+        const pul = m2(anc), tx = rig.view ? pul : [rig.tower != null ? rig.tower : anc[0], pul[1], -4];
+        const colX = rig.view ? pul[0] - 4 : tx[0], colZ = rig.view ? pul[2] : -4;
+        [-1, 1].forEach(sg => tube([colX, fy, colZ + 7 * sg], [colX, 186, colZ + 7 * sg], 2, 'frame', { back: true }));
+        tube([colX, 186, colZ - 9], [colX, 186, colZ + 9], 2, 'frame', { back: true }); box([colX, 22, colZ], [5, 21, 6], 'iron', { back: true });
+        disc(pul, rig.view ? [1, 0, 0] : [0, 0, 1], 3, 1.6, 'frame', { back: true });
+        const end = { W1: Hn, W2: Hf, WL: Hn, WR: Hf, A1: sk.An, A2: sk.Af }[from] || Hn; cable(pul, end);
+        if (/^A/.test(from)) tube(A3(end, [0, 0, 1], -3), A3(end, [0, 0, 1], 3), 2.4, 'pad', {}); });
+    } else if (scene === 'column') { // pec deck / reverse pec deck: seat + back pad + machine column behind
+      const behind = rig.view === 'back' ? 1 : -1;
+      box([H0[0] - 2 * behind, H0[1] - 12.5, 0], [12, 3.2, 15], 'pad', { back: true }); post(H0[0], 0, H0[1] - 16, 2.2);
+      out.push({ k: 'obox', c: sum3(H0, K3(upT, 26), K3([1, 0, 0], 11 * behind)), ax: [K3(upT, 22), [3, 0, 0], [0, 0, 12]], col: 'pad', back: rig.view !== 'back' });
+      [-1, 1].forEach(sg => tube([H0[0] + 20 * behind, fy, 20 * sg], [H0[0] + 20 * behind, 178, 20 * sg], 2.4, 'frame', { back: true }));
+      tube([H0[0] + 20 * behind, 178, -20], [H0[0] + 20 * behind, 178, 20], 2.4, 'frame', { back: true });
+    } else if (scene === 'seatF') {
+      box([H0[0] - 2, H0[1] - 12, 0], [14, 3.4, 18], 'pad', { back: true }); post(H0[0] - 2, 0, H0[1] - 15, 2.4);
+      out.push({ k: 'obox', c: sum3(H0, K3(upT, 22), [-12, 0, 0]), ax: [K3(upT, 20), [3, 0, 0], [0, 0, 12]], col: 'pad', back: true });
+      [sk.Kn, sk.Kf].forEach((K, i) => out.push({ k: 'obox', c: A3(K, [0, 0, 1], (i ? -6 : 6)), ax: [[6, 0, 0], [0, 5, 0], [0, 0, 1.6]], col: 'pad', front: !i }));
+    } else if (scene === 'legpress') {
+      backPad(46, 12); box([H0[0] + 2, H0[1] - 11, 0], [17, 3, 13], 'pad', { back: true }); post(H0[0], 0, H0[1] - 14, 2.4);
+      const A = lerp3(sk.An, sk.Af, 0.5), pd = N3(m2([Math.cos(-125 * R) + 100, 100 + Math.sin(-125 * R)]).map((v, i) => v - m2([100, 100])[i])), pc = A3(A3(A, [1, 0, 0], 3), pd, 0);
+      out.push({ k: 'obox', c: A3(pc, N3(S3(A, sk.Kn)), 3.5), ax: [K3(N3(X3(N3(S3(A, sk.Kn)), [0, 0, 1])), 15), K3(N3(S3(A, sk.Kn)), 1.6), [0, 0, 18]], col: 'frame', front: true });
+      tube([H0[0] + 26, 2, -18], [pc[0] + 26, pc[1] + 26, -18], 2, 'frame', { back: true }); tube([H0[0] + 26, 2, 18], [pc[0] + 26, pc[1] + 26, 18], 2, 'frame', {});
+    } else if (scene === 'hack') {
+      backPad(56, 11); const A = lerp3(sk.An, sk.Af, 0.5);
+      out.push({ k: 'obox', c: [A[0] + 4, A[1] - 2.5, 0], ax: [[17, 1.8, 0], [0, 1.6, 0], [0, 0, 18]], col: 'frame', back: true });
+      [-1, 1].forEach(sg => tube(sum3(H0, K3(upT, 60), K3(fwT, -14), [0, 0, 14 * sg]), [A[0] - 26, fy + 1, 14 * sg], 2, 'frame', { back: sg < 0 }));
+    } else if (scene === 'hyper') {
+      const pad = A3(sk.Hc, sk.fwdP, 4); box([pad[0], pad[1] - 9, 0], [9, 4, 12], 'pad', { back: true });
+      tube([pad[0], pad[1] - 13, 0], [pad[0] - 34, 1, 0], 2.4, 'frame', { back: true });
+      const A = lerp3(sk.An, sk.Af, 0.5); tube([A[0] + 2, A[1] - 4, -11], [A[0] + 2, A[1] - 4, 11], 3, 'pad', { cap: true });
+      tube([A[0] + 2, A[1] - 4, -2], [pad[0] - 30, 14, -2], 1.8, 'frame', { back: true }); tube([pad[0] - 44, 1.2, 0], [A[0] + 14, 1.2, 0], 1.8, 'frame', { back: true });
+    } else if (scene === 'smith') {
+      const x = Hm[0]; [-1, 1].forEach(sg => tube([x - 3, fy, 52 * sg], [x - 3, 196, 52 * sg], 1.8, 'frame', { back: sg < 0 })); tube([x - 3, 196, -52], [x - 3, 196, 52], 1.8, 'frame', { back: true });
+    } else if (scene === 'post') {
+      const x = rig.postX || 132, y = rig.postY || 88; post(x + 2.5, -2, FLOOR - y + oy, 2.6);
+    } else if (scene === 'couch') {
+      box([43.5, 32, -2], [21.5, 32, 22], 'pad', { back: true }); box([71, 3, -2], [13, 3, 16], 'pad', { back: true });
+    } else if (scene === 'roller' && rig.roller) {
+      const [x, y, r] = rig.roller; disc(m2([x, y]), [0, 0, 1], r, 30, 'rubber', { back: true });
+    } else if (scene === 'ball') {
+      out.push({ k: 'ball', c: m2([P2.A1[0] + 4, P2.A1[1] + 15]), r: 15, col: 'rubber', back: true });
+    } else if (scene === 'bag') {
+      cable(m2([186, 0]), m2([186, 24])); out.push({ k: 'obox', c: m2([186, 76]), ax: [[14, 0, 0], [0, 52, 0], [0, 0, 14]], col: 'rubber', back: true });
+    } else if (scene === 'stairs') {
+      [[120, 166], [144, 150], [168, 134]].forEach(([x, y]) => box([x + 36, (FLOOR - y) / 2 + oy, 0], [36 - (x - 120) / 2, (FLOOR - y) / 2, 16], 'frame', { back: true }));
+    } else if (scene === 'treadmill') {
+      out.push({ k: 'obox', c: m2([103, 175]), ax: [[73, 4, 0], [0, 2.4, 0], [0, 0, 16]], col: 'pad', back: true });
+      [-1, 1].forEach(sg => tube(m2([162, 172], 15 * sg), m2([170, 74], 15 * sg), 1.6, 'frame', { back: sg < 0 })); tube(m2([170, 74], -15), m2([170, 74], 15), 3, 'pad', { back: true });
+    } else if (scene === 'bike') {
+      [[[86, 112], [108, 158]], [[108, 158], [150, 98]], [[60, 180], [160, 180]], [[108, 158], [108, 180]]].forEach(([a, b]) => tube(m2(a, -3), m2(b, -3), 2, 'frame', { back: true }));
+      box(m2([86, 108]), [9, 1.8, 5], 'pad', { back: true }); tube(m2([150, 96], -12), m2([150, 96], 12), 1.5, 'steel', {}); disc(m2([108, 158], -6), [0, 0, 1], 17, 3, 'iron', { back: true });
+    } else if (scene === 'rower') {
+      tube(m2([40, 172]), m2([196, 172]), 2.2, 'frame', { back: true }); disc(m2([204, 150]), [0, 0, 1], 16, 8, 'iron', { back: true });
+      box(m2([P2.H ? P2.H[0] : 100, 168]), [9, 2.6, 10], 'pad', { back: true }); [60, 190].forEach(x => tube(m2([x, 172]), m2([x, FLOOR]), 1.6, 'frame', { back: true }));
+      cable(m2([196, 150]), Hm); tube(A3(Hm, [0, 0, 1], -9), A3(Hm, [0, 0, 1], 9), 1.3, 'steel', { front: true });
+    }
     // ---- free weights ----
     const prop = rig.prop;
     const dumbbell = (W, E, along, near) => {
-      const c = A3(W, N3(S3(W, E)), 4.3);
-      const ax = along === 'fwd' ? sk.fwdP : along === 'fa' ? N3(X3(N3(S3(W, E)), sk.latC)) : [0, 0, 1];
+      const s2 = W === sk.Wn ? 'n' : 'f', c = s2 === 'n' ? Hn : Hf, Fr = sk['FAf' + s2];
+      // the handle runs across the palm (through the curled fingers)
+      const ax = along === 'fwd' ? sk.fwdP : along === 'fa' ? N3(X3(N3(S3(W, E)), sk.latC)) : Fr ? Fr.ou : [0, 0, 1];
       tube(A3(c, ax, -7), A3(c, ax, 7), 1.1, 'steel', { front: near });
       [-1, 1].forEach(sg => disc(A3(c, ax, 7.6 * sg), ax, 4.6, 4.2, 'iron', { front: near, hex: true }));
     };
@@ -493,11 +604,44 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
         disc([c[0], c[1], 43 * sg], [0, 0, 1], 2.4, 2, 'steel', {});
         disc([c[0], c[1], 47.5 * sg], [0, 0, 1], pr, 6.6, 'iron', { plate: true });
       });
-    } else if (prop === 'handle' && !eq) {
-      tube(A3(Hm, [0, 0, 1], -8), A3(Hm, [0, 0, 1], 8), 1.2, 'steel', { front: true });
+    } else if (prop === 'handle' && !eq && scene !== 'rower') {
+      if (L3(S3(Hn, Hf)) > 22) [[Hn, sk.En], [Hf, sk.Ef]].forEach(([h, e], i) => { const ax = N3(X3(N3(S3(h, e)), sk.fwdP)); tube(A3(h, ax, -4), A3(h, ax, 4), 1.2, 'steel', { front: !i }); });
+      else tube(A3(Hm, [0, 0, 1], -(o3.grip || 6) - 3), A3(Hm, [0, 0, 1], (o3.grip || 6) + 3), 1.2, 'steel', { front: true });
+    }
+    // kettlebell: a cast-iron ball under a thick D-handle, gripped in the palm
+    const kettlebell = (h, hang, near, rack) => {
+      const d = N3(hang), side = N3(X3(d, Math.abs(d[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1]));
+      const c = A3(h, d, rack ? 6.2 : 8.6);
+      [-1, 1].forEach(sg => tube(A3(h, side, 3.6 * sg), A3(A3(h, side, 3.2 * sg), d, 4.2), 1.25, 'kb', { front: near }));
+      tube(A3(h, side, -3.6), A3(h, side, 3.6), 1.25, 'kb', { front: near });
+      out.push({ k: 'ball', c, r: 6.6, col: 'kb', front: near });
+    };
+    const faDir = s2 => N3(S3(sk['W' + s2], sk['E' + s2]));
+    if (prop === 'kb') kettlebell(Hm, A3(lerp3(faDir('n'), faDir('f'), 0.5), [0, -0.4, 0]), true);
+    else if (prop === 'kb1') kettlebell(Hn, [0, -1, 0], true);
+    else if (prop === 'kbrack') { const back = ortho(K3(sk.fwdP, -1), faDir('n')); kettlebell(Hn, A3(K3(back, 1), faDir('n'), -0.25), true, true); }
+    else if (prop === 'dbv' || prop === 'dbo') { // one dumbbell held vertically: goblet at the chest / overhead triceps extension
+      const d = prop === 'dbv' ? [0, -1, 0] : lerp3(faDir('n'), faDir('f'), 0.5), top = A3(Hm, N3(d), -1.5);
+      tube(top, A3(top, N3(d), 13), 1.1, 'steel', { front: true }); disc(top, N3(d), 4.8, 4.2, 'iron', { front: true, hex: true }); disc(A3(top, N3(d), 14), N3(d), 4.8, 4.2, 'iron', { front: true, hex: true });
+    } else if (prop === 'dbfeet') {
+      const A = lerp3(sk.An, sk.Af, 0.5); tube([A[0], A[1], -7], [A[0], A[1], 7], 1.1, 'steel', {}); [-1, 1].forEach(sg => disc([A[0], A[1], 7.6 * sg], [0, 0, 1], 4.6, 4.2, 'iron', { hex: true }));
+    } else if (prop === 'stick' || prop === 'none' && /band/.test(name + (rig.lines || []).map(l => l[2]).join(''))) {
+      if (prop === 'stick') tube(A3(Hn, N3(S3(Hn, Hf)), 6), A3(Hf, N3(S3(Hf, Hn)), 6), 0.9, 'rubber', { front: true });
+    } else if (prop === 'band') {
+      tube(A3(Hm, [0, 0, 1], -5), A3(Hm, [0, 0, 1], 5), 1.4, 'rubber', { front: true });
+    } else if (prop === 'bandback') {
+      const bk = sum3(sk.Sc, K3(sk.fwdC, -9), K3(sk.upC, -3)); [Hn, Hf].forEach(h => out.push({ k: 'line', a: h, b: bk, w: 1.6, stroke: '#d4493a' }));
+    } else if (prop === 'kneeband') {
+      out.push({ k: 'line', a: A3(sk.Kn, [0, 0, 1], 5), b: A3(sk.Kf, [0, 0, 1], -5), w: 2.2, stroke: '#d4493a' });
+    } else if (prop === 'wheel') {
+      disc(A3(Hm, [0, -1, 0], 3), [0, 0, 1], 7, 4, 'rubber', { front: true }); tube(A3(Hm, [0, 0, 1], -9), A3(Hm, [0, 0, 1], 9), 1.2, 'steel', { front: true });
+    } else if (prop === 'rope') {
+      const low = A3(lerp3(sk.An, sk.Af, 0.5), [0, -1, 0], 1); [Hn, Hf].forEach(h => out.push({ k: 'line', a: h, b: low, w: 0.8, stroke: '#3d434b' }));
+    } else if (prop === 'pads') {
+      [['n', 1], ['f', -1]].forEach(([s2, sg]) => { const E = sk['E' + s2], W = sk['W' + s2]; out.push({ k: 'obox', c: lerp3(E, W, 0.5), ax: [K3(faDir(s2), 8), [0, 0, 1.4 * sg], [2.6, 0, 0]], col: 'pad', front: sg > 0 }); });
     }
     // generic cables / bands from the rig
-    if (!eq || eq === 'flatbench' || eq === 'inclinebench' || eq === 'legext' || eq === 'flatbenchBox') (rig.lines || []).forEach(([a, b, kind]) => {
+    if ((!eq || eq === 'flatbench' || eq === 'inclinebench' || eq === 'legext' || eq === 'flatbenchBox') && scene !== 'tower' && scene !== 'towers') (rig.lines || []).forEach(([a, b, kind]) => {
       const pt = e => { if (typeof e !== 'string') return L2(e); const m = { W1: Hn, W2: Hf, A1: sk.An, A2: sk.Af, F1: sk.Tn, F2: sk.Tf, WL: Hn, WR: Hf, AL: sk.An, AR: sk.Af }; return m[e]; };
       const A = pt(a), B = pt(b); if (!A || !B) return;
       out.push({ k: 'line', a: A, b: B, w: kind === 'cable' ? 0.7 : 1.6, stroke: kind === 'cable' ? '#3d434b' : '#d4493a' });
@@ -564,6 +708,8 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
       if (lo > FLOOR - 1) o.oy = lo - FLOOR + 3; }
     if (rig.view && o.oy == null) { let lo = -1e9; for (let i = 0; i < 16; i++) { const P = M.pose(rig, M.phase(rig, i / 16).q); ['AL', 'AR'].forEach(k => { if (P[k]) lo = Math.max(lo, P[k][1]); }); }
       if (lo > FLOOR - 6) o.oy = lo - FLOOR + 7.5; }
+    if (o.handGrip == null) { const pr = rig.prop, sc = rig.scene;
+      o.handGrip = (pr && !/^(none|kneeband|dbfeet|bandback|pads)$/.test(pr)) || /^(bar|lowbar|rower|bike|towers|treadmill|hyper)$/.test(sc || '') || o.eq === 'pulldown' || o.eq === 'lowrow' ? 1 : 0.35; }
     return (rig._o3 = o);
   }
   let UID = 0;
@@ -779,6 +925,10 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
       faces.forEach(f => { s += `<path d="${polyD(f.pts)}" fill="${shadeCol(o.col, f.lam)}" stroke="${P.line}" stroke-width=".45" stroke-linejoin="round"/>`; });
       return s;
     }
+    if (o.k === 'ball') {
+      const e = ellipse2(cam, o.c, [[o.r, 0, 0], [0, o.r, 0], [0, 0, o.r]]), hl = ellipse2(cam, sum3(o.c, [-o.r * 0.35, o.r * 0.4, 0]), [[o.r * 0.38, 0, 0], [0, o.r * 0.3, 0], [0, 0, o.r * 0.38]]);
+      return `<path d="${smoothD(ellPts(e, 1, 0, 0, 28))}" fill="${shadeCol(o.col, 0.5)}" stroke="${P.line}" stroke-width=".55"/><path d="${smoothD(ellPts(hl, 1, 0, 0, 16))}" fill="#fff" fill-opacity=".16"/>`;
+    }
     if (o.k === 'disc') {
       const ax = N3(o.ax), u = ortho(Math.abs(ax[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], ax), v = X3(ax, u);
       const back = A3(o.c, ax, -o.th / 2 * Math.sign(D3(ax, cam.view) || 1)), front = A3(o.c, ax, o.th / 2 * Math.sign(D3(ax, cam.view) || 1));
@@ -803,7 +953,7 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
       ['Hc', 'Sc', 'Hd', 'Hn', 'Hf', 'Kn', 'Kf', 'An', 'Af', 'Tn', 'Tf', 'Sn', 'Sf', 'En', 'Ef', 'Wn', 'Wf'].forEach(k => { if (sk[k]) ad(cam.pr(sk[k]), k === 'Hd' ? 13 : 9); });
       buildEquip(rig, sk, o3, rig._name).forEach(o => {
         if (o.k === 'tube' || o.k === 'line') { ad(cam.pr(o.a), o.r || 1); ad(cam.pr(o.b), o.r || 1); }
-        else if (o.k === 'disc') ad(cam.pr(o.c), o.r);
+        else if (o.k === 'disc' || o.k === 'ball') ad(cam.pr(o.c), o.r);
         else if (o.k === 'box') ad(cam.pr(o.c), Math.hypot(...o.h) * 0.8);
         else if (o.k === 'obox') ad(cam.pr(o.c), Math.max(...o.ax.map(L3)));
       });
@@ -821,5 +971,5 @@ const hn = K3(hb, 1 / m), w = sstep(0.03, 0.45, m);
   const stillT = rig => { const o = O3[rig._name]; return o && o.still != null ? o.still : rig.key; };
   const _prims = (rig, t, fig) => { const F = FIGS[fig || 'male'], o3 = o3For(rig), P = M.pose(rig, M.phase(rig, t).q), sk = finishSkeleton(rig.view ? liftFront(rig, P, P.q, F, o3) : liftSide(rig, P, P.q, F, o3), o3);
     return { sk, body: buildBody(sk, F, [], [], o3), eq: buildEquip(rig, sk, o3, rig._name) }; };
-  WO.ANATOMY = { _prims, _sk: (rig, t) => { const F = FIGS.male, o3 = o3For(rig), P = M.pose(rig, M.phase(rig, t).q); return finishSkeleton(rig.view ? liftFront(rig, P, P.q, F, o3) : liftSide(rig, P, P.q, F, o3), o3); }, stillT, render: render3, fitBox: fitBox3, O3, FIGS, rigOf, version: 'v26' };
+  WO.ANATOMY = { _prims, _sk: (rig, t) => { const F = FIGS.male, o3 = o3For(rig), P = M.pose(rig, M.phase(rig, t).q); return finishSkeleton(rig.view ? liftFront(rig, P, P.q, F, o3) : liftSide(rig, P, P.q, F, o3), o3); }, stillT, render: render3, fitBox: fitBox3, O3, FIGS, rigOf, _camera: camera, _o3: o3For, version: 'v26' };
 })();

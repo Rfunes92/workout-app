@@ -463,8 +463,9 @@
     birddog: { anchor: ['H', [100, 136]], period: 8000, key: 0.26, spineOk: () => true, arcs: [['S', 'H', 'K2']],
       frames: [X(QUAD, { N: 104 }), X(QUAD, { N: 106, u1: 100, f1: 100, t2: -88, s2: -88, fa2: -84 }), X(QUAD, { N: 104 }), X(QUAD, { N: 106, u2: 100, f2: 100, t1: -88, s1: -88, fa1: -84 })], tl: TL4,
       cues: [C(0, 0.12, 'Hands under shoulders'), C(0.08, 0.38, 'Reach opposite arm & leg'), C(0.2, 0.36, 'No hip tilt \u2014 flat back'), C(0.6, 0.86, 'Pause 2 sec, switch'), C(0.4, 0.56, 'Brace like a poke is coming')] },
-    ccrunch: { anchor: ['K1', [92, 176]], prop: 'handle', lines: [['W1', [128, 2], 'cable']], period: 4400, key: 0.53, spineOk: () => true, arcs: [['S', 'H', 'K1']],
-      frames: [{ T: 172, t1: 2, s1: -90, fa1: -90, ru1: 150, rf1: -60 }, { T: 108, B: 8, t1: 2, s1: -90, fa1: -90, ru1: 150, rf1: -60, N: 70 }], tl: TL2,
+    // v26 rebuild: kneel facing the high pulley, rope by the ears; hips stay parked (thighs barely move), the SPINE flexes
+    ccrunch: { anchor: ['K1', [92, 176]], prop: 'handle', scene: 'tower', tower: 156, lines: [['W1', [150, 6], 'cable']], period: 4400, key: 0.53, spineOk: () => true, arcs: [['S', 'H', 'K1']],
+      frames: [{ T: 152, B: 2, t1: 14, s1: -90, fa1: -90, ru1: 162, rf1: -48, N: 140 }, { T: 128, B: 44, t1: 20, s1: -90, fa1: -90, ru1: 150, rf1: -58, N: 104 }], tl: TL2,
       cues: [C(0, 1, 'Hips stay still'), C(0.14, 0.46, 'Crunch ribs to hips'), C(0.44, 0.62, 'Squeeze abs'), C(0.62, 0.94, 'Return slowly')] },
     rollout: { anchor: ['K1', [70, 176]], prop: 'wheel', period: 5200, key: 0.53, spineOk: () => true, arcs: [['S', 'H', 'K1']],
       frames: [{ T: 124, t1: 14, s1: -90, fa1: -90, u1: 6, f1: 6, wy1: 172, wy2: 172 }, { T: 100, t1: -42, s1: -90, fa1: -90, u1: 60, f1: 60, wy1: 172, wy2: 172 }], tl: TL2,

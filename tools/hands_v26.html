@@ -1,0 +1,13 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>v26 hands close-up</title>
+<style>body{margin:0;background:#fff;font:600 12px system-ui;color:#555}.g{display:grid;grid-template-columns:repeat(var(--cols,6),var(--w,220px));gap:6px;padding:6px}.c{border:1px solid #e5e7eb;border-radius:8px}svg{width:100%;aspect-ratio:1;display:block}small{display:block;padding:2px 6px}</style>
+</head><body><div class="g" id="g"></div>
+<!-- close-up of the near hand: ?ids=a,b&fig=male|female&side=n|f&zoom=20 (half-size of the crop around the wrist, in body units) -->
+<script src="../js/exercises.js"></script><script src="../js/mannequin.js"></script><script src="../js/anatomy.js"></script>
+<script>
+const qs=new URLSearchParams(location.search),A=WO.ANATOMY;if(qs.get('fig'))WO.setFigure(qs.get('fig'));if(qs.get('cols'))document.documentElement.style.setProperty('--cols',qs.get('cols'));
+const Z=+(qs.get('zoom')||16),side=qs.get('side')||'n';
+(qs.get('ids')||'bb_bench,db_curl,kb_swing,pullup,pushup,farmer_carry').split(',').forEach(id=>{const ex=WO.EX_BY_ID[id],r=A.rigOf(ex),t=qs.get('t')?+qs.get('t'):A.stillT(r);
+ const o3=A._o3(r),cm=o3.cam||(r.view?[28,8]:[48,9]),cam=A._camera(...cm),sk=A._sk(r,t),w=sk['W'+side],e=sk['E'+side],h=w.map((v,i)=>v+(v-e[i])/Math.hypot(...w.map((x,j)=>x-e[j]))*3),p=cam.pr(h);
+ const c=document.createElement('div');c.className='c';c.innerHTML='<svg viewBox="'+[p[0]-Z,p[1]-Z,2*Z,2*Z].join(' ')+'">'+A.render(ex,r,t,{still:true,muscles:ex.primary||[]})+'</svg><small>'+ex.name+'</small>';g.appendChild(c);});
+</script></body></html>
